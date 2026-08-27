@@ -12,12 +12,14 @@ class UsuarioSchema(BaseModel):
     email: str = "gabriel.silva@example.com"
     nascimento: Optional[str] = "1990-01-01"  # Formato de data como string
     telefone: int = 1234567890
+    senha: str = "senha123"
     
 class UsuarioBuscaSchema(BaseModel):
     """ Define como deve ser a estrutura que representa a busca. Que será
         feita apenas com base no nome do usuário.
     """
     email: str = "gabriel.silva@example.com"
+    senha_digitada: str = "senha123"
     
 class ListagemUsuariosSchema(BaseModel):
     """ Define como uma listagem de usuários será retornada.
@@ -34,6 +36,7 @@ def apresenta_usuario(usuario: Usuario):
         "email": usuario.email,
         "nascimento": usuario.nascimento.isoformat(), #if usuario.nascimento else None,
         "telefone": usuario.telefone,
+        "senha": usuario.senha,
         "data_de_cadastro": usuario.data_de_cadastro.isoformat() #if usuario.data_de_cadastro else None
     }
     
