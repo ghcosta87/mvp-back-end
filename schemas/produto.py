@@ -1,0 +1,42 @@
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from model.produto import Produto
+
+from datetime import datetime
+
+# from schemas import ComentarioSchema
+
+class ProdutoSchema(BaseModel):
+    """ Define como um novo usuário a ser inserido deve ser representado
+    """
+    nome: str = "Leite Zero Lactose"
+    marca: str = "Parmalat"
+    preco: float = 9.99
+    # estabelecimento: int = 1
+    # data_de_cadastro = datetime.now()
+    data_de_cadastro: datetime = Field(default_factory=datetime.now) # <--- Tipo (: datetime) e Field adicionados
+    
+class ProdutoBuscaSchema(BaseModel):
+    """ Define como deve ser a estrutura que representa a busca. Que será
+        feita apenas com base no nome do usuário.
+    """
+    nome: str = "Leite Zero Lactose"
+    
+class ListagemProdutosSchema(BaseModel):
+    """ Define como uma listagem de usuários será retornada.
+    """
+    nome: List[ProdutoSchema]
+    
+def apresenta_produto(produto: Produto):
+    """ Retorna uma representação do produto seguindo o schema definido em
+        UsuarioViewSchema.
+    """
+    return {
+            "nome": produto.nome,
+            "marca": produto.marca,
+            "preco": produto.preco,
+            # "estabelecimento": produto.estabelecimento,
+            "data_de_cadastro": produto.data_de_cadastro.isoformat()
+    }
+    
+    
