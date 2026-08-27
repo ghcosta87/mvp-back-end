@@ -10,7 +10,8 @@ from urllib.parse import unquote
 
 # from sqlalchemy.exc import IntegrityError
 
-from model import Session, Usuario, Produto  # , Comentario
+from model import Session, Produto  # , Comentario
+from model.usuarios import *
 
 # from logger import logger
 # from mvp.back.schemas import *
@@ -50,6 +51,7 @@ def add_usuario(form: UsuarioSchema):
         email=form.email,
         nascimento=data_convertida,
         telefone=form.telefone,
+        senha=form.senha
     )
     # logger.debug(f"Adicionando produto de nome: '{produto.nome}'")
     try:
@@ -78,7 +80,30 @@ def add_usuario(form: UsuarioSchema):
     #     logger.warning(f"Erro ao adicionar produto '{produto.nome}', {error_msg}")
     #     return {"mesage": error_msg}, 400
 
-
+@app.delete('/deletar_usuario')#, tags=[usuario_tag])
+def deletar_usuario(query: UsuarioBuscaSchema):
+    session = Session()
+    try:
+        # 1. Busca o usuário no banco de dados (ex: pelo email ou CPF)
+        usuario_encontrado = session.query(Usuario).filter(Usuario.email == query.email).first()
+        
+        # 2. Verifica se o usuário realmente existe
+        if not usuario_encontrado:
+            return {"error": "Usuário não encontrado na base de dados."}, 404
+    
+        if usuario_encontrado.verificar_senha(query.senha_digitada):
+            session.delete(usuario_encontrado)
+            session.commit()
+            return {"message": "Usuário deletado com sucesso!"}, 200
+        
+    except Exception as e:
+        # Se der erro, desfaz qualquer alteração pela metade (rollback)
+        session.rollback()
+        return {"error": f"Não foi possível deletar o usuário: {str(e)}"}, 400
+        
+    finally:
+        # Sempre fecha a conexão para não sobrecarregar o servidor
+        session.close()
 ####################################
 #####################
 ###########
