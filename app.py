@@ -84,34 +84,34 @@ def add_usuario(form: UsuarioSchema):
 ###########
 # AQUI TEM QUE SABER COMO VOU ENVIAR AS IMAGENS PARA O POST
 
-# @app.route(
-#     "/upload"
-# )  # , tags=[produto_tag],responses={"200": ProdutoViewSchema, "409": ErrorSchema, "400": ErrorSchema},)
+@app.post(
+    "/upload"
+)  # , tags=[produto_tag],responses={"200": ProdutoViewSchema, "409": ErrorSchema, "400": ErrorSchema},)
 
-# def processar_imagem(form: ProdutoSchema):
-#     if 'imagem' not in request.files:
-#         return jsonify({"erro": "Nenhuma imagem enviada"}), 400
+def processar_imagem(form: ProdutoSchema):
+    if 'imagem' not in request.files:
+        return jsonify({"erro": "Nenhuma imagem enviada"}), 400
     
-#     file = request.files['imagem']
-#     # Converte os bytes recebidos diretamente para uma imagem PIL
-#     image_bytes = file.read()
-#     imagem = Image.open(io.BytesIO(image_bytes))
-#     prompt = "Extraia o estabelecimento, a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais."
-#     # Chamada para o Gemini
-#     response = client.models.generate_content(
-#         model='gemini-2.5-flash',
-#         contents=[imagem, prompt],
-#         config=types.GenerateContentConfig(
-#             response_mime_type="application/json",
-#             response_schema=Produto #,Estabelecimento
-#             temperature=0.1,
-#         ),
-#     )
-#      # Retorna o JSON processado diretamente para o frontend
-#     dados = response.parsed.model_dump()
-#     # TODO: Aqui você executa os INSERTS no seu banco SQL usando o 'dados'
-#     return jsonify(dados)
+    file = request.files['imagem']
+    # Converte os bytes recebidos diretamente para uma imagem PIL
+    image_bytes = file.read()
+    imagem = Image.open(io.BytesIO(image_bytes))
+    prompt = "Extraia o estabelecimento, a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais."
+    # Chamada para o Gemini
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents=[imagem, prompt],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=Produto, #,Estabelecimento
+            temperature=0.1
+        ),
+    )
+     # Retorna o JSON processado diretamente para o frontend
+    dados = response.parsed.model_dump()
+    # TODO: Aqui você executa os INSERTS no seu banco SQL usando o 'dados'
+    return jsonify(dados)
 
-#     if __name__ == '__main__':
-#             # HTTPS é necessário em produção para liberar acesso à câmera
-#         app.run(debug=True)
+    if __name__ == '__main__':
+            # HTTPS é necessário em produção para liberar acesso à câmera
+        app.run(debug=True)
