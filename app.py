@@ -1,37 +1,61 @@
-import io
-
+# ==========================================
+# 1. BIBLIOTECAS NATIVAS DO PYTHON
+# ==========================================
 import os
-from dotenv import load_dotenv, find_dotenv
-from google import genai
-from google.genai import types
-from google.genai.types import GenerateContentConfig
-
-# from tkinter import Image
-from PIL import Image
-import types
-# from xmlrpc import client
-
-from flask_openapi3 import OpenAPI, Info, Tag
-from flask import jsonify, redirect, request
+import io
+import logging
+import warnings
+from datetime import date
 from urllib.parse import unquote
 
-# from sqlalchemy.exc import IntegrityError
+# ==========================================
+# 2. BIBLIOTECAS DE TERCEIROS (pip install)
+# ==========================================
+# Variáveis de ambiente
+from dotenv import load_dotenv, find_dotenv
 
-from model import Session, Produto  # , Comentario
-from model.usuarios import *
-
-# from logger import logger
-# from mvp.back.schemas import *
+# Flask, CORS e Swagger (Servidor Web e API)
+from flask import redirect, request
 from flask_cors import CORS
-from schemas import *
+from flask_openapi3 import OpenAPI, Info
 
-from datetime import date
+# Inteligência Artificial (Google Gemini)
+from google import genai
+from google.genai.types import GenerateContentConfig
 
-# from mvp.back.schemas.produto import ProdutoSchema, apresenta_produto
-
+# Imagens e Conversões
 from PIL import Image
 from pillow_heif import register_heif_opener
-import io
+
+# ==========================================
+# 3. MÓDULOS DO SEU PROJETO (Arquivos Locais)
+# ==========================================
+# Constantes
+import model.constants as const
+
+# Banco de Dados
+from model import Session
+from model.produto import Produto
+from model.usuarios import Usuario
+
+# Schemas (Validação de Dados)
+from schemas.usuarios import UsuarioSchema, UsuarioBuscaSchema,apresenta_usuario
+from schemas.produto import (
+    CupomExtraidoSchema#,
+)  # , ProdutoSchema, ListagemProdutosSchema, ItemExtraido
+from schemas.upload import UploadSchema
+
+# ==========================================
+# CONFIGURAÇÕES GLOBAIS
+# ==========================================
+
+load_dotenv(find_dotenv())
+chave_api = os.getenv("API_KEY")  # Verifique se no .env está API_KEY ou GEMINI_API_KEY
+# Cria o cliente do Gemini permanentemente para o servidor usar
+client = genai.Client(api_key=chave_api)
+
+logging.getLogger("google.genai").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", message=".*automatic function calling.*")
 
 # Liga o suporte a HEIC dentro do Pillow
 register_heif_opener()
@@ -96,207 +120,93 @@ def add_usuario(form: UsuarioSchema):
 
 
 @app.delete("/deletar_usuario")  # , tags=[usuario_tag])
-def deletar_usuario(query: UsuarioBuscaSchema):
+def deletar_usuario(body: UsuarioBuscaSchema):
     session = Session()
     try:
-        # 1. Busca o usuário no banco de dados (ex: pelo email ou CPF)
         usuario_encontrado = (
-            session.query(Usuario).filter(Usuario.email == query.email).first()
+            session.query(Usuario).filter(Usuario.email == body.email).first()
         )
-
-        # 2. Verifica se o usuário realmente existe
         if not usuario_encontrado:
-            return {"error": "Usuário não encontrado na base de dados."}, 404
+            return {"error": const.ERROR_SQL_USER_NOT_FOUND}, 404
 
-        if usuario_encontrado.verificar_senha(query.senha_digitada):
+        if usuario_encontrado.verificar_senha(body.senha_digitada):
             session.delete(usuario_encontrado)
             session.commit()
-            return {"message": "Usuário deletado com sucesso!"}, 200
+            return {"message": const.SUCCESS_SQL_USER_DEL}, 200
+        else:
+            return {"error": const.ERROR_SQL_USER_WRONG_PASSWORD}, 401
 
     except Exception as e:
-        # Se der erro, desfaz qualquer alteração pela metade (rollback)
         session.rollback()
-        return {"error": f"Não foi possível deletar o usuário: {str(e)}"}, 400
+        return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, 400
 
     finally:
-        # Sempre fecha a conexão para não sobrecarregar o servidor
         session.close()
 
 
-####################################
-#####################
-###########
-# AQUI TEM QUE SABER COMO VOU ENVIAR AS IMAGENS PARA O POST
-
-# Importe o schema que você criou (ajuste de acordo com o arquivo onde você o salvou)
-from schemas import UploadSchema 
-
-@app.post('/upload')#, tags=[produto_tag])
-def upload_imagem(form: UploadSchema): # <-- Passamos o schema aqui!
+@app.post("/upload")  # , tags=[produto_tag])
+def upload_imagem(form: UploadSchema):
     """
-    Recebe a imagem, valida e retorna sucesso.
+    Recebe a imagem, valida, filtra e adiciona os produtos ao banco de dados.
     """
     file = form.imagem
-    
-    # 1. Rebobina e lê os bytes
     file.seek(0)
     image_bytes = file.read()
-    
-    load_dotenv(find_dotenv())
-    chave_api = os.getenv("API_KEY")
 
-    # 2. Cria o cliente OFICIAL do Gemini (esta é a variável que o seu código precisa!)
-    client = genai.Client(api_key=chave_api)
-    
     if not image_bytes:
-            return {"error": "Os bytes da imagem estão vazios."}, 400
-    
-    # Verifica se o arquivo não está corrompido ou vazio
-    if file.filename == '':
-        return {"error": "O arquivo enviado está vazio."}, 400
-    
-    print("Testando conexão com o Gemini...")
-    try:
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents="Responda apenas 'Olá' se você estiver me ouvindo."
-        )
-        print(f"Resposta do Gemini: {response.text}")
-        # return {"mensagem": response.text}
-    except Exception as e:
-        return {"erro": str(e)}
+        return {"error": const.ERROR_EMPTY_IMAGE}, 400
+    if file.filename == "":
+        return {"error": const.ERROR_EMPTY_FILE}, 400
 
-    # ==========================================
-    # CÓDIGO DA IA ENTRARÁ AQUI
-    # ==========================================
     try:
-        # 2. Abre a imagem (agora o código entende HEIC!)
+        # 1. PROCESSAMENTO DA IA
         imagem_original = Image.open(io.BytesIO(image_bytes))
-        
-        # 3. Converte para o padrão visual RGB (remove camadas ocultas do HEIC)
         imagem_tratada = imagem_original.convert("RGB")
-        
-        #  Converte os bytes recebidos diretamente para uma imagem PIL
-        # image_bytes = file.read()
-        # imagem = Image.open(io.BytesIO(image_bytes))
-        
-        #prompt = "Extraia o estabelecimento, a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais."
-        prompt = "Extraia a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos."
 
-        # Chamada para o Gemini
         response = client.models.generate_content(
-        # response = client.chats.create(
-        # response = client.chats.send_message_stream(
-            # gemini-3.6-flash
-            # model="gemini-2.5-flash",
-            model="gemini-3.6-flash",
-            contents=[imagem_tratada, prompt],
-            # config=types.GenerateContentConfig(
+            model=const.GEMINI_MODEL,
+            contents=[imagem_tratada, const.PROMPT],
             config=GenerateContentConfig(
                 response_mime_type="application/json",
-                # response_schema=Produto,  # ,Estabelecimento
-                response_schema=CupomExtraidoSchema,                                
+                response_schema=CupomExtraidoSchema,
                 temperature=0.1,
             ),
         )
-        # response = client.chats.send_message([imagem_tratada, prompt])
-        # Retorna o JSON processado diretamente para o frontend
         dados = response.parsed.model_dump()
-        
-        
-        for e in dados['produtos']:
-            produto = Produto(
-                id=None,  # O ID será gerado automaticamente pelo banco de dados
-                nome=e['nome'],
-                marca=e['marca'],
-                preco=e['preco']
-                # estabelecimento=None  # Ajuste conforme necessário
-            )
-            adicionar_produto(produto)       
-        
-        return dados,200
-        
-        # TODO: Aqui você executa os INSERTS no seu banco SQL usando o 'dados'
-        # return jsonify(dados)
-        
-        ########################################
-        # data_convertida = date.fromisoformat(
-        #         form.nascimento
-        #     )  # if form.nascimento else None
-        
-        #     usuario = Usuario(
-        #         nome_completo=form.nome_completo,
-        #         cpf=form.cpf,
-        #         email=form.email,
-        #         nascimento=data_convertida,
-        #         telefone=form.telefone,
-        #         senha=form.senha,
-        #     )
-        #     # logger.debug(f"Adicionando produto de nome: '{produto.nome}'")
-        ########################################        
-        try:
-            session = Session()
-            session.add(produto)
-            session.commit()
-            return apresenta_produto(produto), 200
-        except Exception as e:
-            return {"error": str(e)}, 400
-        ########################################
-        
-        
-        
+
     except Exception as e:
         return {
-            "status": "erro", 
-            "message": f"Erro ao processar a imagem: {str(e)}",
-            "arquivo_recebido": file.filename
+            "status": "erro",
+            "message": f"{const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}",
+            "arquivo_recebido": file.filename,
         }, 500
-    
-    # Retorna o JSON de sucesso
-    return {
-        "status": "sucesso", 
-        "message": "A imagem chegou perfeitamente no servidor Flask!",
-        
-        "arquivo_recebido": file.filename
-    }, 200
-    
-# @app.post(
-#     "/upload"
-# )  # , tags=[produto_tag],responses={"200": ProdutoViewSchema, "409": ErrorSchema, "400": ErrorSchema},)
-# def processar_imagem(form: ProdutoSchema):
-#     if "imagem" not in request.files:
-#         return jsonify({"erro": "Nenhuma imagem enviada"}), 400
 
-#     file = request.files["imagem"]
+    # 2. SALVAMENTO NO BANCO DE DADOS
+    session = Session()
+    produtos_salvos = []
 
-#     if file.filename == "":
-#         return {"error": "O arquivo enviado está vazio."}, 400
-
-#     # Converte os bytes recebidos diretamente para uma imagem PIL
-#     image_bytes = file.read()
-#     imagem = Image.open(io.BytesIO(image_bytes))
-#     prompt = "Extraia o estabelecimento, a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais."
-#     # Chamada para o Gemini
-#     response = client.models.generate_content(
-#         model="gemini-2.5-flash",
-#         contents=[imagem, prompt],
-#         config=types.GenerateContentConfig(
-#             response_mime_type="application/json",
-#             response_schema=Produto,  # ,Estabelecimento
-#             temperature=0.1,
-#         ),
-#     )
-#     # Retorna o JSON processado diretamente para o frontend
-#     dados = response.parsed.model_dump()
-#     # TODO: Aqui você executa os INSERTS no seu banco SQL usando o 'dados'
-#     # return jsonify(dados)
-
-#     return {
-#         "status": "sucesso",
-#         "message": "A imagem chegou perfeitamente no servidor Flask!",
-#         "arquivo_recebido": file.filename,
-#     }, 200
-
-#     # if __name__ == '__main__':
-#     #         # HTTPS é necessário em produção para liberar acesso à câmera
-#     #     app.run(debug=True)
+    try:
+        for item in dados["produtos"]:
+            produto = Produto(
+                nome=item["nome"],
+                marca=item.get("marca", "Sem marca"), # Fallback seguro caso a IA não encontre
+                preco=item["preco"],
+            )
+            session.add(produto)
+            produtos_salvos.append(produto.nome)
+            
+        session.commit()
+        return {
+            "status": "sucesso",
+            "message": f"{len(produtos_salvos)} {const.SUCCESS_SQL_PRODUCT_ADD}",
+            "produtos_extraidos": dados["produtos"],
+        }, 200
+    except Exception as e:
+        session.rollback()
+        return {
+            "status": "erro",
+            "message": f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}",
+            "arquivo_recebido": file.filename,
+        }, 500
+    finally:
+        session.close()
