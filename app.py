@@ -144,6 +144,33 @@ def deletar_usuario(body: UsuarioBuscaSchema):
         session.close()
 
 
+@app.post("/login")  # , tags=[usuario_tag])
+def logar(body: UsuarioBuscaSchema):
+    session = Session()
+    try:
+        usuario_encontrado = (
+            session.query(Usuario).filter(Usuario.email == body.email).first()
+        )
+        if not usuario_encontrado:
+            return {"error": const.ERROR_SQL_USER_NOT_FOUND}, 404
+
+        if usuario_encontrado.verificar_senha(body.senha_digitada):
+         return {
+                "message": "Login realizado com sucesso",
+                "email": usuario_encontrado.email,
+                # Se o seu model tiver 'nome' ou 'nome_completo', você pode retornar aqui:
+                # "nome": usuario_encontrado.nome 
+            }, 200
+        else:
+            return {"error": const.ERROR_SQL_USER_WRONG_PASSWORD}, 401
+
+    except Exception as e:
+        session.rollback()
+        return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, 400
+
+    finally:
+        session.close()
+
 @app.post("/upload")  # , tags=[produto_tag])
 def upload_imagem(form: UploadSchema):
     """
