@@ -1,9 +1,15 @@
 import io
 
+import os
+from dotenv import load_dotenv, find_dotenv
+from google import genai
+from google.genai import types
+from google.genai.types import GenerateContentConfig
+
 # from tkinter import Image
 from PIL import Image
 import types
-from xmlrpc import client
+# from xmlrpc import client
 
 from flask_openapi3 import OpenAPI, Info, Tag
 from flask import jsonify, redirect, request
@@ -22,6 +28,13 @@ from schemas import *
 from datetime import date
 
 # from mvp.back.schemas.produto import ProdutoSchema, apresenta_produto
+
+from PIL import Image
+from pillow_heif import register_heif_opener
+import io
+
+# Liga o suporte a HEIC dentro do Pillow
+register_heif_opener()
 
 info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
@@ -123,21 +136,115 @@ def upload_imagem(form: UploadSchema): # <-- Passamos o schema aqui!
     """
     Recebe a imagem, valida e retorna sucesso.
     """
-    arquivo = form.imagem
+    file = form.imagem
+    
+    # 1. Rebobina e lê os bytes
+    file.seek(0)
+    image_bytes = file.read()
+    
+    load_dotenv(find_dotenv())
+    chave_api = os.getenv("API_KEY")
+
+    # 2. Cria o cliente OFICIAL do Gemini (esta é a variável que o seu código precisa!)
+    client = genai.Client(api_key=chave_api)
+    
+    if not image_bytes:
+            return {"error": "Os bytes da imagem estão vazios."}, 400
     
     # Verifica se o arquivo não está corrompido ou vazio
-    if arquivo.filename == '':
+    if file.filename == '':
         return {"error": "O arquivo enviado está vazio."}, 400
+    
+    print("Testando conexão com o Gemini...")
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents="Responda apenas 'Olá' se você estiver me ouvindo."
+        )
+        print(f"Resposta do Gemini: {response.text}")
+        # return {"mensagem": response.text}
+    except Exception as e:
+        return {"erro": str(e)}
 
     # ==========================================
     # CÓDIGO DA IA ENTRARÁ AQUI
     # ==========================================
+    try:
+        # 2. Abre a imagem (agora o código entende HEIC!)
+        imagem_original = Image.open(io.BytesIO(image_bytes))
+        
+        # 3. Converte para o padrão visual RGB (remove camadas ocultas do HEIC)
+        imagem_tratada = imagem_original.convert("RGB")
+        
+        #  Converte os bytes recebidos diretamente para uma imagem PIL
+        # image_bytes = file.read()
+        # imagem = Image.open(io.BytesIO(image_bytes))
+        
+        #prompt = "Extraia o estabelecimento, a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais."
+        prompt = "Extraia a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos."
+
+        # Chamada para o Gemini
+        # response = client.models.generate_content(
+        response = client.chats.create(
+            # gemini-3.6-flash
+            # model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
+            contents=[imagem_tratada, prompt],
+            # config=types.GenerateContentConfig(
+            config=GenerateContentConfig(
+                response_mime_type="application/json",
+                # response_schema=Produto,  # ,Estabelecimento
+                response_schema=CupomExtraidoSchema,                                
+                temperature=0.1,
+            ),
+        )
+        response = client.chats.send_message([imagem_tratada, prompt])
+        # Retorna o JSON processado diretamente para o frontend
+        dados = response.parsed.model_dump()
+        return dados,200
+        
+        # TODO: Aqui você executa os INSERTS no seu banco SQL usando o 'dados'
+        # return jsonify(dados)
+        
+        ########################################
+        # data_convertida = date.fromisoformat(
+        #         form.nascimento
+        #     )  # if form.nascimento else None
+        
+        #     usuario = Usuario(
+        #         nome_completo=form.nome_completo,
+        #         cpf=form.cpf,
+        #         email=form.email,
+        #         nascimento=data_convertida,
+        #         telefone=form.telefone,
+        #         senha=form.senha,
+        #     )
+        #     # logger.debug(f"Adicionando produto de nome: '{produto.nome}'")
+        ########################################        
+        # try:
+        #     session = Session()
+        #     session.add(produto)
+        #     session.commit()
+        #     return apresenta_produto(produto), 200
+        # except Exception as e:
+        #     return {"error": str(e)}, 400
+        ########################################
+        
+        
+        
+    except Exception as e:
+        return {
+            "status": "erro", 
+            "message": f"Erro ao processar a imagem: {str(e)}",
+            "arquivo_recebido": file.filename
+        }, 500
     
     # Retorna o JSON de sucesso
     return {
         "status": "sucesso", 
         "message": "A imagem chegou perfeitamente no servidor Flask!",
-        "arquivo_recebido": arquivo.filename
+        
+        "arquivo_recebido": file.filename
     }, 200
     
 # @app.post(

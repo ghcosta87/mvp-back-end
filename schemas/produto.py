@@ -6,6 +6,23 @@ from datetime import datetime
 
 # from schemas import ComentarioSchema
 
+from pydantic import BaseModel
+from typing import List
+
+class ItemExtraido(BaseModel):
+    """ Representa um único produto lido da nota fiscal """
+    nome: str
+    # descricao: str
+    marca: str
+    preco: float
+
+class CupomExtraidoSchema(BaseModel):
+    """ Representa o resultado total que a IA vai devolver """
+    estabelecimento: str
+    marca: str
+    data: str
+    produtos: List[ItemExtraido]
+    
 class ProdutoSchema(BaseModel):
     """ Define como um novo usuário a ser inserido deve ser representado
     """

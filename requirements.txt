@@ -12,3 +12,4 @@ flask-openapi3[swagger]
 
 python-dotenv 
 pillow
+pillow-heif
