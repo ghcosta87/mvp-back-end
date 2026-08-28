@@ -3,7 +3,7 @@ from sqlalchemy import Column, Float, ForeignKey, String, Integer, DateTime, Dat
 # from sqlalchemy.orm import relationship # para usar JOIN
 from datetime import datetime
 from typing import Union
-from model import Base #, Estabelecimento  # , Comentario
+from model import Base  # , Estabelecimento  # , Comentario
 
 
 class Produto(Base):
@@ -18,8 +18,8 @@ class Produto(Base):
     data_de_cadastro = Column(DateTime, default=datetime.now())
 
     def __init__(
-        self, id: int, nome: str, marca: str, preco: float, estabelecimento: int
-    ):
+        self, id: int, nome: str, marca: str, preco: float
+    ):  # , estabelecimento: int):
         """
         Cadastra um novo produto no banco de dados
         id: id do produto

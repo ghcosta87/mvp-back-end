@@ -184,8 +184,9 @@ def upload_imagem(form: UploadSchema): # <-- Passamos o schema aqui!
         prompt = "Extraia a data (YYYY-MM-DD) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos."
 
         # Chamada para o Gemini
-        # response = client.models.generate_content(
-        response = client.chats.create(
+        response = client.models.generate_content(
+        # response = client.chats.create(
+        # response = client.chats.send_message_stream(
             # gemini-3.6-flash
             # model="gemini-2.5-flash",
             model="gemini-3.6-flash",
@@ -198,9 +199,21 @@ def upload_imagem(form: UploadSchema): # <-- Passamos o schema aqui!
                 temperature=0.1,
             ),
         )
-        response = client.chats.send_message([imagem_tratada, prompt])
+        # response = client.chats.send_message([imagem_tratada, prompt])
         # Retorna o JSON processado diretamente para o frontend
         dados = response.parsed.model_dump()
+        
+        
+        for e in dados['produtos']:
+            produto = Produto(
+                id=None,  # O ID será gerado automaticamente pelo banco de dados
+                nome=e['nome'],
+                marca=e['marca'],
+                preco=e['preco']
+                # estabelecimento=None  # Ajuste conforme necessário
+            )
+            adicionar_produto(produto)       
+        
         return dados,200
         
         # TODO: Aqui você executa os INSERTS no seu banco SQL usando o 'dados'
@@ -221,13 +234,13 @@ def upload_imagem(form: UploadSchema): # <-- Passamos o schema aqui!
         #     )
         #     # logger.debug(f"Adicionando produto de nome: '{produto.nome}'")
         ########################################        
-        # try:
-        #     session = Session()
-        #     session.add(produto)
-        #     session.commit()
-        #     return apresenta_produto(produto), 200
-        # except Exception as e:
-        #     return {"error": str(e)}, 400
+        try:
+            session = Session()
+            session.add(produto)
+            session.commit()
+            return apresenta_produto(produto), 200
+        except Exception as e:
+            return {"error": str(e)}, 400
         ########################################
         
         

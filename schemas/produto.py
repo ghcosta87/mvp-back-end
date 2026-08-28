@@ -44,7 +44,7 @@ class ListagemProdutosSchema(BaseModel):
     """
     nome: List[ProdutoSchema]
     
-def apresenta_produto(produto: Produto):
+def apresenta_produto(produto: ProdutoSchema):
     """ Retorna uma representação do produto seguindo o schema definido em
         UsuarioViewSchema.
     """
@@ -55,5 +55,13 @@ def apresenta_produto(produto: Produto):
             # "estabelecimento": produto.estabelecimento,
             "data_de_cadastro": produto.data_de_cadastro.isoformat()
     }
+    
+def adicionar_produto(produto: Produto):
+    """ Adiciona um produto no banco de dados """
+    from model import Session  # Importa a sessão do SQLAlchemy
+
+    session = Session()
+    session.add(produto)
+    session.commit()
     
     
