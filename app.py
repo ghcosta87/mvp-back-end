@@ -41,7 +41,8 @@ from model.usuarios import Usuario
 # Schemas (Validação de Dados)
 from schemas.usuarios import UsuarioSchema, UsuarioBuscaSchema,apresenta_usuario
 from schemas.produto import (
-    CupomExtraidoSchema#,
+    CupomExtraidoSchema,
+    ListagemProdutosSchema#,
 )  # , ProdutoSchema, ListagemProdutosSchema, ItemExtraido
 from schemas.upload import UploadSchema
 
@@ -237,3 +238,59 @@ def upload_imagem(form: UploadSchema):
         }, 500
     finally:
         session.close()
+
+from flask import jsonify
+
+# ... (suas outras rotas aqui)
+
+# 1. O Schema vai no 'responses' indicando que é a SAÍDA da rota
+@app.get('/produtos')#, tags=[produto_tag], responses={"200": ListagemProdutosSchema})
+def listar_produtos(): # 2. A função agora não recebe parâmetros (GET limpo)
+    session = Session()
+    try:
+        # Busca todos os produtos cadastrados no banco de dados
+        produtos_db = session.query(Produto).all()
+        
+        # Cria uma lista vazia para armazenar os dados formatados
+        lista_produtos = []
+        
+        # Transforma cada produto do banco em um dicionário
+        for produto in produtos_db:
+            lista_produtos.append({
+                "id": produto.id,
+                "nome": produto.nome,
+                "preco": float(produto.preco) 
+            })
+            
+        # 3. Devolve um DICIONÁRIO com a chave "produtos" (Flask-OpenAPI3 converte para JSON sozinho)
+        return {"produtos": lista_produtos}, 200
+
+    except Exception as e:
+        print(f"Erro ao buscar produtos: {e}")
+        # return {"error": "Falha ao buscar produtos no banco de dados."}, 500
+        return {"error": f"O Python reclamou disso: {str(e)}"}, 500
+    
+# @app.get('/produtos')#, methods=['GET'])
+# def listar_produtos(form: ListagemProdutosSchema):
+#     try:
+#         # 1. Busca todos os produtos cadastrados no banco de dados
+#         produtos_db = Produto.query.all()
+        
+#         # 2. Cria uma lista vazia para armazenar os dados formatados
+#         lista_produtos = []
+        
+#         # 3. Transforma cada produto do banco em um dicionário (JSON)
+#         for produto in produtos_db:
+#             lista_produtos.append({
+#                 "id": produto.id,
+#                 "nome": produto.nome,
+#                 # Garante que o preço vá como número (float) para o JS conseguir usar o .toFixed(2)
+#                 "preco": float(produto.preco) 
+#             })
+            
+#         # 4. Devolve a lista pronta para o Front-end
+#         return jsonify(lista_produtos), 200
+
+#     except Exception as e:
+#         print(f"Erro ao buscar produtos: {e}")
+#         return jsonify({"error": "Falha ao buscar produtos no banco de dados."}), 500
