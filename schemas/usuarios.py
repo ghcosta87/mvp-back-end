@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 from typing import Optional, List
 from model.usuarios import Usuario
 
@@ -7,12 +7,12 @@ from model.usuarios import Usuario
 class UsuarioSchema(BaseModel):
     """ Define como um novo usuário a ser inserido deve ser representado
     """
-    nome_completo: str = "Gabriel Silva"
-    cpf: str = "123.456.789-00"
-    email: str = "gabriel.silva@example.com"
-    nascimento: Optional[str] = "1990-01-01"  # Formato de data como string
-    telefone: int = 1234567890
-    senha: str = "senha123"
+    nome_completo: str = Field(...,example="Gabriel Silva")
+    cpf: str = Field(...,example="123.456.789-00")
+    email: str = Field(...,example="gabriel.silva@example.com")
+    nascimento: Optional[str] = Field(...,example="1990-01-01")  # Formato de data como string
+    telefone: int = Field(...,example=1234567890)
+    senha: str = Field(...,example="senha123")
     
 class UsuarioBuscaSchema(BaseModel):
     """ Define como deve ser a estrutura que representa a busca. Que será

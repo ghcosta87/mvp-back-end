@@ -15,6 +15,7 @@ class Produto(Base):
     preco = Column(Float)
     # estabelecimento = Column(Integer, ForeignKey("estabelecimentos.pk_estabelecimento"))
     # a verificar interligação entre as tabelas produto e estabelecimento
+    # link= Column(Integer)
     data_de_cadastro = Column(DateTime, default=datetime.now())
 
     def __init__(
