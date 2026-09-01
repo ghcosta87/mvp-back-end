@@ -56,6 +56,7 @@ tag_image = Tag(
     name="Imagens", description="Funções de upload e processamento de imagens"
 )
 tag_produtos = Tag(name="Produtos", description="Funções de listagem de produtos")
+tag_home =Tag(name="Home", description="Função de redirecionamento para a documentação da API")
 
 # ==========================================
 # CONFIGURAÇÕES GLOBAIS
@@ -74,6 +75,11 @@ info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
 CORS(app)
 
+
+@app.get("/",tags=[tag_home])
+def home():
+    """Redireciona para /openapi, tela que permite a escolha do estilo de documentação."""
+    return redirect("/openapi")
 
 @app.post(
     "/adicionar_usuario",
