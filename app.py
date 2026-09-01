@@ -46,7 +46,7 @@ from model.usuarios import Usuario
 from schemas.usuarios import UsuarioSchema, UsuarioBuscaSchema, apresenta_usuario
 from schemas.produto import CupomExtraidoSchema, ProdutoSchema
 from schemas.upload import UploadSchema
-from schemas.error import ErrorSchema
+from schemas.error import ErrorSchema, ErrorUploadSchema
 
 # ==========================================
 # DEFINIÇÃO DAS HOME TAGS
@@ -104,6 +104,7 @@ def add_usuario(body: UsuarioSchema):
     except Exception as e:
         return {"mesage": str(e)}, 400
 
+
 @app.delete(
     "/deletar_usuario",
     tags=[tag_user],
@@ -119,8 +120,10 @@ def deletar_usuario(body: UsuarioBuscaSchema):
     try:
         success = False
         session = Session()
-        usuario_encontrado = session.query(Usuario).filter(Usuario.email == body.email).first()
-        
+        usuario_encontrado = (
+            session.query(Usuario).filter(Usuario.email == body.email).first()
+        )
+
         if not usuario_encontrado:
             return {"error": const.ERROR_SQL_USER_NOT_FOUND}, 404
 
@@ -138,6 +141,7 @@ def deletar_usuario(body: UsuarioBuscaSchema):
     except Exception as e:
         session.rollback()
         return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, 400
+
 
 @app.post(
     "/login",
@@ -179,7 +183,7 @@ def logar(body: UsuarioBuscaSchema):
         "200": UploadSchema,
         "409": ErrorSchema,
         "400": ErrorSchema,
-        "401": ErrorSchema,
+        "500": ErrorUploadSchema,
     },
 )
 def upload_imagem(form: UploadSchema):
@@ -225,6 +229,7 @@ def upload_imagem(form: UploadSchema):
     try:
         for item in dados["produtos"]:
             produto = Produto(
+                id=None,
                 nome=item["nome"],
                 marca=item.get(
                     "marca", "Sem marca"
@@ -242,10 +247,11 @@ def upload_imagem(form: UploadSchema):
         }, 200
     except Exception as e:
         session.rollback()
+        print(f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}")
         return {
             "status": "erro",
             "message": f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}",
-            "arquivo_recebido": file.filename,
+            "arquivo": file.filename,
         }, 500
     finally:
         session.close()
@@ -262,6 +268,9 @@ def upload_imagem(form: UploadSchema):
     },
 )
 def listar_produtos():
+    """
+    Retorna todos os produtos cadastrados no banco de dados
+    """
     lista_produtos = []
 
     try:
