@@ -95,3 +95,9 @@ Link para o vídeo: [https://www.youtube.com/](https://www.youtube.com/)...
 Link para o repositório do back-end: [https://github.com/seu-usuario/back-end](https://github.com/seu-usuario/back-end)...
 Link para o repositório do front-end: [https://github.com/seu-usuario/front-end](https://github.com/seu-usuario/front-end)...
 ```
+
+
+### Notas de aprendizado ~ Referências
+Nota da Documentação:
+"Este atributo booleano indica ao navegador que o script deve ser executado após a análise do documento, mas antes do evento DOMContentLoaded ser disparado."
+Referência: MDN Web Docs - O elemento Script de Imersão (Atributo defer)

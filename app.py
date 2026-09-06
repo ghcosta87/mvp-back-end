@@ -56,7 +56,9 @@ tag_image = Tag(
     name="Imagens", description="Funções de upload e processamento de imagens"
 )
 tag_produtos = Tag(name="Produtos", description="Funções de listagem de produtos")
-tag_home =Tag(name="Home", description="Função de redirecionamento para a documentação da API")
+tag_home = Tag(
+    name="Home", description="Função de redirecionamento para a documentação da API"
+)
 
 # ==========================================
 # CONFIGURAÇÕES GLOBAIS
@@ -76,39 +78,46 @@ app = OpenAPI(__name__, info=info)
 CORS(app)
 
 
-@app.get("/",tags=[tag_home])
+@app.get("/", tags=[tag_home])
 def home():
     """Redireciona para /openapi, tela que permite a escolha do estilo de documentação."""
     return redirect("/openapi")
 
+
 @app.post(
     "/adicionar_usuario",
     tags=[tag_user],
-    responses={"200": UsuarioSchema, "409": ErrorSchema, "400": ErrorSchema},
+    responses={
+        "200": UsuarioSchema,
+        "400": ErrorSchema,
+        "409": ErrorSchema,
+        "422": ErrorSchema,
+    },
 )
-def add_usuario(body: UsuarioSchema):
+def add_usuario(form: UsuarioSchema):
     """Adiciona um novo Usuário à base de dados."""
-    data_convertida = date.fromisoformat(body.nascimento)
+    data_convertida = date.fromisoformat(form.nascimento)
 
     usuario = Usuario(
-        nome_completo=body.nome_completo,
-        cpf=body.cpf,
-        email=body.email,
+        nome_completo=form.nome_completo,
+        cpf=form.cpf,
+        email=form.email,
         nascimento=data_convertida,
-        telefone=body.telefone,
-        senha=body.senha,
+        telefone=form.telefone,
+        senha=form.senha,
     )
 
     try:
         session = Session()
         session.add(usuario)
-        session.commit()
-        session.close()
+        session.commit()        
         return apresenta_usuario(usuario), 200
     except IntegrityError:
         return {"mesage": "CPF, E-mail ou Telefone já cadastrados."}, 409
     except Exception as e:
         return {"mesage": str(e)}, 400
+    finally:
+        session.close()
 
 
 @app.delete(
