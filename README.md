@@ -101,3 +101,8 @@ Link para o repositório do front-end: [https://github.com/seu-usuario/front-end
 Nota da Documentação:
 "Este atributo booleano indica ao navegador que o script deve ser executado após a análise do documento, mas antes do evento DOMContentLoaded ser disparado."
 Referência: MDN Web Docs - O elemento Script de Imersão (Atributo defer)
+
+
+## BUGS
+- se apagar a base de dados é possivel logar e ver os dados que ficaram salvos
+- cadastro concluido com sucesso está retornando erro no toast

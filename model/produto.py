@@ -10,9 +10,11 @@ class Produto(Base):
     __tablename__ = "produtos"
 
     id = Column("pk_produto", Integer, primary_key=True)
-    nome = Column(String(100), unique=True)
+    nome = Column(String(100))
     marca = Column(String(200))
     preco = Column(Float)
+    # dia_da_compra=Column(DateTime, default=datetime.now(),unique=True)
+    
     # estabelecimento = Column(Integer, ForeignKey("estabelecimentos.pk_estabelecimento"))
     # a verificar interligação entre as tabelas produto e estabelecimento
     # link= Column(Integer)
