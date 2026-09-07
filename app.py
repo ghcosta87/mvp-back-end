@@ -6,7 +6,7 @@ import io
 import logging
 from sqlite3 import IntegrityError
 import warnings
-from datetime import date
+from datetime import date, datetime
 
 # from urllib.parse import unquote
 
@@ -23,11 +23,13 @@ from flask_openapi3 import OpenAPI, Info, Tag
 
 # Inteligência Artificial (Google Gemini)
 from google import genai
-from google.genai.types import GenerateContentConfig
+from google.genai.types import GenerateContentConfig, HttpOptions
 
 # Imagens e Conversões
 from PIL import Image
 from pillow_heif import register_heif_opener
+
+from http import HTTPStatus
 
 # from sqlalchemy import JSON
 
@@ -66,10 +68,18 @@ tag_home = Tag(
 
 load_dotenv(find_dotenv())
 chave_api = os.getenv("API_KEY")
-client = genai.Client(api_key=chave_api)
 
-logging.getLogger("google.genai").setLevel(logging.ERROR)
+# logging.getLogger("google.genai").setLevel(logging.INFO)
 warnings.filterwarnings("ignore", message=".*automatic function calling.*")
+import logging
+
+logging.basicConfig(level=logging.DEBUG)  # nível DEBUG, não INFO — mostra tudo
+logging.getLogger("google.genai").setLevel(logging.DEBUG)
+logging.getLogger("httpx").setLevel(logging.DEBUG)  # camada HTTP usada pelo SDK
+logging.getLogger("httpcore").setLevel(
+    logging.DEBUG
+)  # camada ainda mais baixa (sockets/conexões)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 
 register_heif_opener()  # Liga o suporte a HEIC dentro do Pillow
 
@@ -110,7 +120,7 @@ def add_usuario(form: UsuarioSchema):
     try:
         session = Session()
         session.add(usuario)
-        session.commit()        
+        session.commit()
         return apresenta_usuario(usuario), 200
     except IntegrityError:
         return {"mesage": "CPF, E-mail ou Telefone já cadastrados."}, 409
@@ -205,6 +215,8 @@ def upload_imagem(form: UploadSchema):
     """
     Recebe a imagem, valida, filtra e adiciona os produtos ao banco de dados.
     """
+    print(f"${datetime.now()} função upload_imagem em andamento.")
+
     file = form.imagem
     file.seek(0)
     image_bytes = file.read()
@@ -219,6 +231,9 @@ def upload_imagem(form: UploadSchema):
         imagem_original = Image.open(io.BytesIO(image_bytes))
         imagem_tratada = imagem_original.convert("RGB")
 
+        client = genai.Client(api_key=chave_api)
+
+        print(f"${datetime.now()} iniciando consulta com a IA")
         response = client.models.generate_content(
             model=const.GEMINI_MODEL,
             contents=[imagem_tratada, const.PROMPT],
@@ -226,16 +241,24 @@ def upload_imagem(form: UploadSchema):
                 response_mime_type="application/json",
                 response_schema=CupomExtraidoSchema,
                 temperature=0.1,
+                http_options=HttpOptions(
+                    timeout=30000
+                ),  # timeout em milissegundos (ajuste conforme necessário)
             ),
         )
         dados = response.parsed.model_dump()
 
+        print(f"${datetime.now()} Término da consulta com a IA")
+
     except Exception as e:
+        print(f"{datetime.now()} {const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}")
         return {
             "status": "erro",
             "message": f"{const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}",
             "arquivo_recebido": file.filename,
-        }, 500
+        }, HTTPStatus.GATEWAY_TIMEOUT
+    finally:
+        print(f"${datetime.now()} função upload_imagem finalizada.")
 
     # 2. SALVAMENTO NO BANCO DE DADOS
     session = Session()
@@ -249,6 +272,7 @@ def upload_imagem(form: UploadSchema):
                 marca=item.get(
                     "marca", "Sem marca"
                 ),  # Fallback seguro caso a IA não encontre
+                data_da_compra=item.get("data", datetime.now()),
                 preco=item["preco"],
             )
             session.add(produto)
@@ -263,11 +287,12 @@ def upload_imagem(form: UploadSchema):
     except Exception as e:
         session.rollback()
         print(f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}")
+        print(f"lista de produtos extraídos: {dados['produtos']}")
         return {
             "status": "erro",
             "message": f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}",
             "arquivo": file.filename,
-        }, 500
+        }, HTTPStatus.INTERNAL_SERVER_ERROR
     finally:
         session.close()
 
@@ -294,10 +319,18 @@ def listar_produtos():
 
         for produto in produtos_db:
             lista_produtos.append(
-                {"id": produto.id, "nome": produto.nome, "preco": float(produto.preco)}
+                {
+                    "id": produto.id,
+                    "nome": produto.nome,
+                    "data_da_compra": produto.data_da_compra,
+                    "preco": float(produto.preco),
+                }
             )
         session.close()
         return {"produtos": lista_produtos}, 200
 
     except Exception as e:
         return {"error": f"O Python reclamou disso: {str(e)}"}, 500
+
+if __name__ == "__main__":
+    app.run(debug=True, threaded=True)

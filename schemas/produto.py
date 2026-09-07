@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from model.produto import Produto
 from model.constants import *
+
 # from model import Session  # Importa a sessão do SQLAlchemy
 
 from datetime import datetime
@@ -13,28 +14,33 @@ from typing import List
 
 class ItemExtraido(BaseModel):
     """Representa um único produto lido da nota fiscal"""
+
     nome: str
     # descricao: str
     marca: str
     preco: float
 
+
 class CupomExtraidoSchema(BaseModel):
     """Representa o resultado total que a IA vai devolver"""
+
     estabelecimento: str
     marca: str
-    data: str
+    data: datetime = Field(default_factory=datetime.now)
     produtos: List[ItemExtraido]
+
 
 class ProdutoSchema(BaseModel):
     """Define como um novo usuário a ser inserido deve ser representado"""
+
     nome: str = "Leite Zero Lactose"
     marca: str = "Parmalat"
     preco: float = 9.99
+    data_da_compra: datetime = Field(default_factory=datetime.now)
     # estabelecimento: int = 1
     # data_de_cadastro = datetime.now()
-    data_de_cadastro: datetime = Field(
-        default_factory=datetime.now
-    )  # <--- Tipo (: datetime) e Field adicionados
+    data_de_cadastro: datetime = Field(default_factory=datetime.now)
+
 
 # class ProdutoBuscaSchema(BaseModel):
 #     """Define como deve ser a estrutura que representa a busca. Que será
