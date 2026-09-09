@@ -2,6 +2,7 @@
 __pycache__/
 schemas/__pycache__/
 model/__pycache__/
+logs/
 mvp
 .env
 
