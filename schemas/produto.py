@@ -2,7 +2,10 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 from model.produto import Produto
+from model.estabelecimento import Estabelecimento
 from model.constants import *
+
+from schemas.estabelecimento import EstabelecimentoSchema
 
 # from model import Session  # Importa a sessão do SQLAlchemy
 
@@ -18,14 +21,17 @@ class ItemExtraido(BaseModel):
     nome: str
     # descricao: str
     marca: str
+    loja: str
     preco: float
-
 
 class CupomExtraidoSchema(BaseModel):
     """Representa o resultado total que a IA vai devolver"""
 
-    estabelecimento: str
-    marca: str
+    loja: EstabelecimentoSchema
+    # nome_da_loja: str
+    # descricao_da_loja: str
+    # endereco_da_loja: str
+    # marca: str
     data: datetime = Field(default_factory=datetime.now)
     produtos: List[ItemExtraido]
 
@@ -74,3 +80,27 @@ class ProdutoSchema(BaseModel):
 #     session = Session()
 #     session.add(produto)
 #     session.commit()
+
+# from sqlalchemy import func
+
+# def listar_produtos_agrupados(session):
+#     subquery = (
+#         session.query(
+#             Produto.nome,
+#             func.max(Produto.data_da_compra).label("ultima_data")
+#         )
+#         .group_by(Produto.nome)
+#         .subquery()
+#     )
+
+#     produtos_atuais = (
+#         session.query(Produto)
+#         .join(
+#             subquery,
+#             (Produto.nome == subquery.c.nome) &
+#             (Produto.data_da_compra == subquery.c.ultima_data)
+#         )
+#         .all()
+#     )
+
+#     return produtos_atuais

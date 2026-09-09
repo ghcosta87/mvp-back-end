@@ -39,3 +39,7 @@ class Produto(Base):
         self.preco = preco
         # self.estabelecimento = estabelecimento
         self.data_de_cadastro = datetime.now()
+
+
+# class Historico(Produto):
+#     __tablename__ = "historico"

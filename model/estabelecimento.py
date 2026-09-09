@@ -9,9 +9,9 @@ class Estabelecimento(Base):
     __tablename__ = "estabelecimentos"
 
     id = Column("pk_estabelecimento", Integer, primary_key=True)
-    nome = Column(String(100), unique=True)
+    nome = Column(String(100))
     descricao = Column(String(200))
-    endereco = Column(String(200))
+    endereco = Column(String(200), unique=True)
     data_de_cadastro = Column(DateTime, default=datetime.now())
     
     def __init__(self,id:int,nome:str,descricao:str,endereco:str):

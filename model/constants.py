@@ -5,7 +5,10 @@ GEMINI_MODEL_1 = "gemini-3.1-flash-lite"
 GEMINI_MODEL_2 = "gemini-3.6-flash"
 GEMINI_MODEL = GEMINI_MODEL_1
 
-PROMPT ="Extraia a data (DD-MM-YYY) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos."
+PROMPT_REV0 ="Extraia a data (DD-MM-YYY) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos."
+PROMPT_REV1 ="Extraia a data (DD-MM-YYY) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos. Também extraia o nome do estabelecimento, breve descrição e endereço"
+PROMPT_REV2 ="Extraia a data (DD-MM-YYY) e a lista de produtos com preços unitários finais e suas respectivas marcas tentando dar o nome completo aos produtos seguido do respectivo peso ou tamanho quando aplicavel. Também extraia o nome do estabelecimento, breve descrição e endereço"
+PROMPT = PROMPT_REV2
 
 ERROR_GEMINI_IMAGE_PROCESS="Erro interno ao processar a imagem com a IA:"
 

@@ -1,19 +1,19 @@
-# from pydantic import BaseModel
-# from typing import Optional, List
-# from model.estabelecimento import Estabelecimento
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from model.estabelecimento import Estabelecimento
 
-# from datetime import datetime
+from datetime import datetime
 
-# # from schemas import ComentarioSchema
+# from schemas import ComentarioSchema
 
-# class EstabelecimentoSchema(BaseModel):
-#     """ Define como um novo estabelecimento a ser inserido deve ser representado
-#     """
-#     nome: str = "Pão de Açucar"
-#     descricao: str = "alguma coisa"
-#     endereco: str = "Rio de Janeiro"
-#     estabelecimento: int = 1
-#     data_de_cadastro = datetime.now()
+class EstabelecimentoSchema(BaseModel):
+    """ Define como um novo estabelecimento a ser inserido deve ser representado
+    """
+    nome: str = "Pão de Açucar"
+    descricao: str = "alguma coisa"
+    endereco: str = "Rio de Janeiro"
+    estabelecimento: int = 1
+    data_de_cadastro: datetime = Field(default_factory=datetime.now)
     
 # class EstabelecimentoBuscaSchema(BaseModel):
 #     """ Define como deve ser a estrutura que representa a busca. Que será

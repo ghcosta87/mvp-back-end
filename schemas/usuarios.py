@@ -27,6 +27,12 @@ class UsuarioBuscaSchema(BaseModel):
     email: str = "gabriel.silva@example.com"
     senha_digitada: str = "senha123"
     
+    @field_validator('senha_digitada', mode='before')
+    @classmethod
+    def garantir_string(cls, v):
+        # Converte qualquer dado (inclusive números puros como 6666) para string antes da validação
+        return str(v) if v is not None else ""
+    
 class ListagemUsuariosSchema(BaseModel):
     """ Define como uma listagem de usuários será retornada.
     """

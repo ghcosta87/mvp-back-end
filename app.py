@@ -31,7 +31,7 @@ from pillow_heif import register_heif_opener
 
 from http import HTTPStatus
 
-# from sqlalchemy import JSON
+from sqlalchemy import func
 
 # ==========================================
 # 3. MÓDULOS DO SEU PROJETO (Arquivos Locais)
@@ -43,6 +43,7 @@ import model.constants as const
 from model import Session
 from model.produto import Produto
 from model.usuarios import Usuario
+from model.estabelecimento import Estabelecimento
 
 # Schemas (Validação de Dados)
 from schemas.usuarios import UsuarioSchema, UsuarioBuscaSchema, apresenta_usuario
@@ -130,7 +131,7 @@ def add_usuario(form: UsuarioSchema):
         session.close()
 
 
-@app.delete(
+@app.post(
     "/deletar_usuario",
     tags=[tag_user],
     responses={
@@ -138,21 +139,23 @@ def add_usuario(form: UsuarioSchema):
         "409": ErrorSchema,
         "400": ErrorSchema,
         "401": ErrorSchema,
+        "422": ErrorSchema,
     },
 )
-def deletar_usuario(body: UsuarioBuscaSchema):
+def deletar_usuario(form: UsuarioBuscaSchema):
     """Deleta um Usuário da base de dados."""
+    print(f"email do usuario para deletar: ${form.email}")
     try:
         success = False
         session = Session()
         usuario_encontrado = (
-            session.query(Usuario).filter(Usuario.email == body.email).first()
+            session.query(Usuario).filter(Usuario.email == form.email).first()
         )
 
         if not usuario_encontrado:
-            return {"error": const.ERROR_SQL_USER_NOT_FOUND}, 404
+            return {"error": const.ERROR_SQL_USER_NOT_FOUND}, HTTPStatus.NOT_FOUND
 
-        if usuario_encontrado.verificar_senha(body.senha_digitada):
+        if usuario_encontrado.verificar_senha(form.senha_digitada):
             session.delete(usuario_encontrado)
             session.commit()
             session.close()
@@ -176,6 +179,7 @@ def deletar_usuario(body: UsuarioBuscaSchema):
         "409": ErrorSchema,
         "400": ErrorSchema,
         "401": ErrorSchema,
+        "404": ErrorSchema,
     },
 )
 def logar(body: UsuarioBuscaSchema):
@@ -241,9 +245,9 @@ def upload_imagem(form: UploadSchema):
                 response_mime_type="application/json",
                 response_schema=CupomExtraidoSchema,
                 temperature=0.1,
-                http_options=HttpOptions(
-                    timeout=30000
-                ),  # timeout em milissegundos (ajuste conforme necessário)
+                # http_options=HttpOptions(
+                #     timeout=30000
+                # ),  # timeout em milissegundos (ajuste conforme necessário)
             ),
         )
         dados = response.parsed.model_dump()
@@ -265,6 +269,13 @@ def upload_imagem(form: UploadSchema):
     produtos_salvos = []
 
     try:
+        if "loja" in dados:
+            loja_dados = dados["loja"]
+            loja = Estabelecimento(
+                None, loja_dados["nome"], loja_dados["descricao"], loja_dados["endereco"]
+            )
+            session.add(loja)
+
         for item in dados["produtos"]:
             produto = Produto(
                 id=None,
@@ -326,11 +337,76 @@ def listar_produtos():
                     "preco": float(produto.preco),
                 }
             )
+
+        resultados = (
+            session.query(
+                Produto.nome,
+                func.count(Produto.id).label("total_compras"),
+                func.avg(Produto.preco).label("preco_medio"),
+                func.min(Produto.preco).label("menor_preco"),
+                func.max(Produto.preco).label("maior_preco"),
+            )
+            .group_by(Produto.nome)
+            .all()
+        )
+
+        resultado_formatados = [
+            {
+                "nome": linha.nome,
+                "total_compras": linha.total_compras,
+                "preco_medio": round(linha.preco_medio, 2),
+                "menor_preco": linha.menor_preco,
+                "maior_preco": linha.maior_preco,
+            }
+            for linha in resultados
+        ]
+
+        historico = (
+            session.query(Produto.nome, Produto.data_da_compra, Produto.preco)
+            .order_by(Produto.nome, Produto.data_da_compra.asc())
+            .all()
+        )
+
+        historico_agrupado = {}
+        for linha in historico:
+            historico_agrupado.setdefault(linha.nome, []).append(
+                {
+                    "data": (
+                        linha.data_da_compra.isoformat()
+                        if linha.data_da_compra
+                        else None
+                    ),
+                    "valor": float(linha.preco),
+                }
+            )
+
+        # return {"estatisticas": dados_formatados}, 200
+
         session.close()
-        return {"produtos": lista_produtos}, 200
+        return {
+            "produtos": lista_produtos,
+            "estatisticas": resultado_formatados,
+            "historico": historico_agrupado,
+        }, 200
 
     except Exception as e:
         return {"error": f"O Python reclamou disso: {str(e)}"}, 500
+
+
+@app.post(
+    "/join_product",
+    tags=[tag_produtos],
+    responses={
+        "200": UsuarioSchema,
+        "409": ErrorSchema,
+        "400": ErrorSchema,
+        "401": ErrorSchema,
+    },
+)
+def juntar_produtos():
+
+    return 0
+
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)
