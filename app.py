@@ -4,6 +4,7 @@
 import os
 import io
 import logging
+from logging.handlers import RotatingFileHandler
 from sqlite3 import IntegrityError
 import warnings
 from datetime import date, datetime
@@ -74,12 +75,21 @@ chave_api = os.getenv("API_KEY")
 warnings.filterwarnings("ignore", message=".*automatic function calling.*")
 import logging
 
-logging.basicConfig(level=logging.DEBUG)  # nível DEBUG, não INFO — mostra tudo
+
+from logger import logger
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        RotatingFileHandler(
+            "logs/debug.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
+        )
+    ],
+)
 logging.getLogger("google.genai").setLevel(logging.DEBUG)
-logging.getLogger("httpx").setLevel(logging.DEBUG)  # camada HTTP usada pelo SDK
-logging.getLogger("httpcore").setLevel(
-    logging.DEBUG
-)  # camada ainda mais baixa (sockets/conexões)
+logging.getLogger("httpx").setLevel(logging.DEBUG)
+logging.getLogger("httpcore").setLevel(logging.DEBUG)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 
 register_heif_opener()  # Liga o suporte a HEIC dentro do Pillow
@@ -87,6 +97,9 @@ register_heif_opener()  # Liga o suporte a HEIC dentro do Pillow
 info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
 CORS(app)
+
+
+logger.info(f"Aplicatição iniciada")
 
 
 @app.get("/", tags=[tag_home])
@@ -272,7 +285,10 @@ def upload_imagem(form: UploadSchema):
         if "loja" in dados:
             loja_dados = dados["loja"]
             loja = Estabelecimento(
-                None, loja_dados["nome"], loja_dados["descricao"], loja_dados["endereco"]
+                None,
+                loja_dados["nome"],
+                loja_dados["descricao"],
+                loja_dados["endereco"],
             )
             session.add(loja)
 
@@ -322,10 +338,14 @@ def listar_produtos():
     """
     Retorna todos os produtos cadastrados no banco de dados
     """
+    logger.info(f"Requisição recebida em /produtos")
+
     lista_produtos = []
 
     try:
         session = Session()
+        logger.info(f"Iniciada secção do banco de dados")
+
         produtos_db = session.query(Produto).all()
 
         for produto in produtos_db:
@@ -382,7 +402,10 @@ def listar_produtos():
 
         # return {"estatisticas": dados_formatados}, 200
 
+        logger.info(f"Fechando banco de dados")
         session.close()
+        logger.info(f"Termino da função listar_produtos sem erros")
+
         return {
             "produtos": lista_produtos,
             "estatisticas": resultado_formatados,
@@ -390,6 +413,8 @@ def listar_produtos():
         }, 200
 
     except Exception as e:
+
+        logger.error(f"O Python reclamou disso: {str(e)}, retornando código 500")
         return {"error": f"O Python reclamou disso: {str(e)}"}, 500
 
 
@@ -410,3 +435,6 @@ def juntar_produtos():
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)
+
+
+logger.info(f"Aplicação principal carregada")
