@@ -41,7 +41,18 @@ Abra o [http://localhost:5000/#/](http://localhost:5000/#/) no navegador para ve
 mkdir precohub
 cd precohub
 git clone https://github.com/ghcosta87/mvp-back-end.git
+mv mvp-back-end backend
+
+echo 'API_NAME="Gemini API Key"' > backend/.env
+echo 'API_KEY=""' >> backend/.env
+echo 'PROJECT_NAME=""' >> backend/.env 
+echo 'PROJECT_NUMBER=""' >> backend/.env
+nano backend/.env
+
 git clone https://github.com/ghcosta87/mvp-front-end.git
+mv mvp-front-end frontend
+
+nano frontend/js/constantes.js
 
 echo "FROM python:3.10-slim" > backend/Dockerfile
 echo "WORKDIR /app" >> backend/Dockerfile
@@ -49,26 +60,22 @@ echo "COPY requirements.txt ." >> backend/Dockerfile
 echo "RUN pip3 install -r requirements.txt" >> backend/Dockerfile
 echo "COPY . ." >> backend/Dockerfile
 echo "EXPOSE 5000" >> backend/Dockerfile
-echo "CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]" >> backend/Dockerfile
+echo 'CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]' >> backend/Dockerfile
 
-echo "FROM python:3.10-slim" > frontend/Dockerfile
-echo "WORKDIR /app" >> frontend/Dockerfile
-echo "COPY requirements.txt ." >> frontend/Dockerfile
-echo "RUN pip3 install -r requirements.txt" >> frontend/Dockerfile
-echo "COPY . ." >> frontend/Dockerfile
-echo "EXPOSE 5000" >> frontend/Dockerfile
-echo "CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]" >> frontend/Dockerfile
+echo "FROM nginx:alpine" > frontend/Dockerfile
+echo "COPY . /usr/share/nginx/html" >> frontend/Dockerfile
+echo "EXPOSE 80" >> frontend/Dockerfile
 
 echo "services:" > docker-compose.yaml
 echo "  api:" >> docker-compose.yaml
 echo "    build: ./backend" >> docker-compose.yaml
 echo "    ports:" >> docker-compose.yaml
-echo "      - "5000:5000"" >> docker-compose.yaml
+echo "      - "35111:5000"" >> docker-compose.yaml
 echo "    restart: unless-stopped" >> docker-compose.yaml
 echo "  web:" >> docker-compose.yaml
 echo "    build: ./frontend" >> docker-compose.yaml
 echo "    ports:" >> docker-compose.yaml
-echo "      - "80:80"" >> docker-compose.yaml
+echo "      - "35112:80"" >> docker-compose.yaml
 echo "    depends_on:" >> docker-compose.yaml
 echo "      - api" >> docker-compose.yaml
 echo "    restart: unless-stopped" >> docker-compose.yaml
@@ -76,17 +83,36 @@ echo "    restart: unless-stopped" >> docker-compose.yaml
 docker-compose up -d --build
 ```
 
+## CONFIGURAR API DO GEMINI
+1. Acesse o link ()[] 
+2. Gere sua chave API
+3. Edite o arquivo em backend/.env com as credenciais da API
+
+
 ## COMO ATUALIZAR
+Na pasta pasta raiz "precohub":
 ```bash
-# Na pasta pasta raiz "precohub":
+docker compose down --rmi all
+
 mv frontend/Dockerfile Dockerfile-frontend
 mv backend/Dockerfile Dockerfile-backend
-rm -R frontend backend
+mv backend/.env .env
+mv database/db.sqlite3 db.sqlite3
+
+rm -Rf frontend backend
+
 git clone https://github.com/ghcosta87/mvp-back-end.git
+mv mvp-back-end backend
+mv .env backend/.env
+
 git clone https://github.com/ghcosta87/mvp-front-end.git
+mv mvp-front-end frontend
 mv Dockerfile-frontend frontend/Dockerfile
 mv Dockerfile-backend backend/Dockerfile
-docker compose down --rmi all && docker compose up -d --build
+mv db.sqlite3 database/db.sqlite3
+nano frontend/js/constantes.js
+
+docker compose up -d --build
 ```
 ## Histórico de versões:
 - [x] Primeira instalação e testes de fucionamento  
@@ -100,3 +126,4 @@ docker compose down --rmi all && docker compose up -d --build
 
 ## FEAT REQUEST
 - [ ] botao no alto a direita pra trocar o tema, com apenas um icone
+- [ ] adicionar o spinner de loading no botao de cadastro
