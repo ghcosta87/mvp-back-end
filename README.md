@@ -76,6 +76,18 @@ echo "    restart: unless-stopped" >> docker-compose.yaml
 docker-compose up -d --build
 ```
 
+## COMO ATUALIZAR
+```bash
+# Na pasta pasta raiz "precohub":
+mv frontend/Dockerfile Dockerfile-frontend
+mv backend/Dockerfile Dockerfile-backend
+rm -R frontend backend
+git clone https://github.com/ghcosta87/mvp-back-end.git
+git clone https://github.com/ghcosta87/mvp-front-end.git
+mv Dockerfile-frontend frontend/Dockerfile
+mv Dockerfile-backend backend/Dockerfile
+docker compose down --rmi all && docker compose up -d --build
+```
 ## Histórico de versões:
 - [x] Primeira instalação e testes de fucionamento  
 - [ ] 
