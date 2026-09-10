@@ -2,11 +2,13 @@
 __pycache__/
 schemas/__pycache__/
 model/__pycache__/
+database/
 logs/
 mvp
 .env
 
 *.pyc
+*.sqlite3
 
 # Ignora o ambiente virtual
 env/
