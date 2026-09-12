@@ -1,9 +1,7 @@
-from sqlalchemy import Column, Float, String, Integer, DateTime, Date #,Float
-
-# from sqlalchemy.orm import relationship # para usar JOIN
+from sqlalchemy import Column, String, Integer, DateTime
 from datetime import datetime
-from typing import Union
 from model import Base  # , Comentario
+
 
 class Estabelecimento(Base):
     __tablename__ = "estabelecimentos"
@@ -13,8 +11,8 @@ class Estabelecimento(Base):
     descricao = Column(String(200))
     endereco = Column(String(200), unique=True)
     data_de_cadastro = Column(DateTime, default=datetime.now())
-    
-    def __init__(self,id:int,nome:str,descricao:str,endereco:str):
+
+    def __init__(self, id: int, nome: str, descricao: str, endereco: str):
         """
         Cadastra um novo estabelecimento no banco de dados
         id: id do estabelecimento

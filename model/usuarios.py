@@ -1,9 +1,8 @@
-from sqlalchemy import Column, String, Integer, DateTime, Date  # ,Float
+from sqlalchemy import Column, String, Integer, DateTime, Date 
 
-# from sqlalchemy.orm import relationship # para usar JOIN
 from datetime import datetime
 from typing import Union
-from model import Base  # , Comentario
+from model import Base 
 
 from werkzeug.security import generate_password_hash, check_password_hash
 

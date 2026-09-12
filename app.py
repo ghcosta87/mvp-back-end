@@ -6,10 +6,10 @@ import io
 import logging
 from logging.handlers import RotatingFileHandler
 from sqlite3 import IntegrityError
-import warnings
-from datetime import date, datetime
+from sqlalchemy import func
 
-# from urllib.parse import unquote
+# import warnings
+from datetime import date, datetime
 
 # ==========================================
 # 2. BIBLIOTECAS DE TERCEIROS (pip install)
@@ -18,7 +18,7 @@ from datetime import date, datetime
 from dotenv import load_dotenv, find_dotenv
 
 # Flask, CORS e Swagger (Servidor Web e API)
-from flask import redirect  # , request
+from flask import redirect
 from flask_cors import CORS
 from flask_openapi3 import OpenAPI, Info, Tag
 
@@ -31,8 +31,6 @@ from PIL import Image
 from pillow_heif import register_heif_opener
 
 from http import HTTPStatus
-
-from sqlalchemy import func
 
 # ==========================================
 # 3. MÓDULOS DO SEU PROJETO (Arquivos Locais)
@@ -71,12 +69,9 @@ tag_home = Tag(
 load_dotenv(find_dotenv())
 chave_api = os.getenv("API_KEY")
 
-# logging.getLogger("google.genai").setLevel(logging.INFO)
-warnings.filterwarnings("ignore", message=".*automatic function calling.*")
-import logging
-
-
+# warnings.filterwarnings("ignore", message=".*automatic function calling.*")
 from logger import logger
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -98,7 +93,6 @@ info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
 CORS(app)
 
-
 logger.info(f"Aplicatição iniciada")
 
 
@@ -113,8 +107,9 @@ def home():
     tags=[tag_user],
     responses={
         "200": UsuarioSchema,
-        "400": ErrorSchema,
-        "409": ErrorSchema,
+        HTTPStatus.BAD_REQUEST: ErrorSchema,
+        HTTPStatus.UNAUTHORIZED: ErrorSchema,
+        HTTPStatus.CONFLICT: ErrorSchema,
         "422": ErrorSchema,
     },
 )
@@ -135,11 +130,11 @@ def add_usuario(form: UsuarioSchema):
         session = Session()
         session.add(usuario)
         session.commit()
-        return apresenta_usuario(usuario), 200
+        return apresenta_usuario(usuario), HTTPStatus.OK
     except IntegrityError:
-        return {"mesage": "CPF, E-mail ou Telefone já cadastrados."}, 409
+        return {"message": "CPF, E-mail ou Telefone já cadastrados."}, HTTPStatus.CONFLICT
     except Exception as e:
-        return {"mesage": str(e)}, 400
+        return {"message": str(e)}, HTTPStatus.BAD_REQUEST
     finally:
         session.close()
 

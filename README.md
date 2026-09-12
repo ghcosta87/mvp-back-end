@@ -113,7 +113,7 @@ docker compose down --rmi all
 mv backend/.env .env
 mv backend/database/db.sqlite3 db.sqlite3
 
-rm -Rf frontend backend
+rm -Rf backend
 
 git clone https://github.com/ghcosta87/mvp-back-end.git
 mv mvp-back-end backend
@@ -140,6 +140,7 @@ docker compose up -d
 - [ ] modal fica aberto na pagina inicial
 - [ ] algumas vezes o aviso "toast" fica somente em vermelho
 - [ ] ao anexar o arquivo o sidebar não esconde
+- [ ] avisos do painel nao estao centralizados
 
 ## FEAT REQUEST
 - [ ] botao no alto a direita pra trocar o tema, com apenas um icone

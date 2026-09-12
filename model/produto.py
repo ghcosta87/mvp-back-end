@@ -1,9 +1,6 @@
-from sqlalchemy import Column, Float, ForeignKey, String, Integer, DateTime, Date, Float
-
-# from sqlalchemy.orm import relationship # para usar JOIN
+from sqlalchemy import Column, Float, String, Integer, DateTime, Float
 from datetime import datetime
-from typing import Union
-from model import Base  # , Estabelecimento  # , Comentario
+from model import Base
 
 
 class Produto(Base):
@@ -39,7 +36,3 @@ class Produto(Base):
         self.preco = preco
         # self.estabelecimento = estabelecimento
         self.data_de_cadastro = datetime.now()
-
-
-# class Historico(Produto):
-#     __tablename__ = "historico"
