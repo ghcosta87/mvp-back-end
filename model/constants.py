@@ -20,9 +20,9 @@ SUCCESS_SQL_USER_DEL="Usuário deletado com sucesso!"
 
 ERROR_SQL_PRODUCT_ADD="Erro ao adicionar produtos no banco de dados:"
 
-ERROR_SQL_USER_NOT_FOUND="Usuário não encontrado na base de dados."
+ERROR_SQL_USER_NOT_FOUND="Usuário não encontrado."
 ERROR_SQL_USER_DEL="Não foi possível deletar o usuário: "
-ERROR_SQL_USER_WRONG_PASSWORD="Senha incorreta. Acesso negado."
+ERROR_SQL_USER_WRONG_PASSWORD="Senha incorreta."
 
 
 # ==========================================

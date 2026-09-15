@@ -126,13 +126,11 @@ nano frontend/js/constantes.js
 
 docker compose build
 
-rm -Rf frontend backend
-mkdir backend backend/database
-
 mv db.sqlite3 backend/database/db.sqlite3
 mv .env backend/.env
 
 docker compose up -d
+
 ```
 ## BUGS
 - [ ] se apagar a base de dados é possivel logar e ver os dados que ficaram salvos
@@ -141,6 +139,10 @@ docker compose up -d
 - [ ] algumas vezes o aviso "toast" fica somente em vermelho
 - [ ] ao anexar o arquivo o sidebar não esconde
 - [ ] avisos do painel nao estao centralizados
+- [ ] botao voltar na janela de cadastro esta sem fade ao passar o mouse
+- [ ] precisa alterar a resposta para receber o nome do usuário, e não o email
+- [ ] precisa rever função "renderizarLista" "filtrarProdutos"
+- [ ] preciso entender melhor o filehandler, está muito bagunçado
 
 ## FEAT REQUEST
 - [ ] botao no alto a direita pra trocar o tema, com apenas um icone
@@ -148,3 +150,16 @@ docker compose up -d
 - [ ] passar texto simulando chat da AI abaixo da barra de pesquisaq
 - [ ] criar fila de envio
 - [ ] permitir guardar as fotos
+- [ ] criar página inicial acima de todas para indicar o carregamento
+
+
+## CHECKLIST PRE ENTREGA
+### Backend
+```python
+# Testes de POST deletar_usuario
+HTTPStatus.OK                     # 200  # ✅
+HTTPStatus.BAD_REQUEST            # 400  # 
+HTTPStatus.UNAUTHORIZED           # 401  # ✅
+HTTPStatus.CONFLICT               # 409  #
+HTTPStatus.UNPROCESSABLE_ENTITY   # 422  # 
+```

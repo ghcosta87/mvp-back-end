@@ -106,11 +106,11 @@ def home():
     "/adicionar_usuario",
     tags=[tag_user],
     responses={
-        "200": UsuarioSchema,
+        HTTPStatus.OK: UsuarioSchema,
         HTTPStatus.BAD_REQUEST: ErrorSchema,
         HTTPStatus.UNAUTHORIZED: ErrorSchema,
         HTTPStatus.CONFLICT: ErrorSchema,
-        "422": ErrorSchema,
+        HTTPStatus.UNPROCESSABLE_ENTITY: ErrorSchema,
     },
 )
 def add_usuario(form: UsuarioSchema):
@@ -132,22 +132,24 @@ def add_usuario(form: UsuarioSchema):
         session.commit()
         return apresenta_usuario(usuario), HTTPStatus.OK
     except IntegrityError:
-        return {"message": "CPF, E-mail ou Telefone já cadastrados."}, HTTPStatus.CONFLICT
+        return {
+            "message": "CPF, E-mail ou Telefone já cadastrados." # <?> adicionar constant de texto
+        }, HTTPStatus.CONFLICT
     except Exception as e:
         return {"message": str(e)}, HTTPStatus.BAD_REQUEST
     finally:
         session.close()
 
 
-@app.post(
+@app.post( # <?> atualizar as respostas dos esquemas
     "/deletar_usuario",
     tags=[tag_user],
     responses={
-        "200": UsuarioSchema,
-        "409": ErrorSchema,
-        "400": ErrorSchema,
-        "401": ErrorSchema,
-        "422": ErrorSchema,
+        HTTPStatus.OK: UsuarioSchema,
+        HTTPStatus.BAD_REQUEST: ErrorSchema,
+        HTTPStatus.UNAUTHORIZED: ErrorSchema,
+        HTTPStatus.CONFLICT: ErrorSchema, # ?
+        HTTPStatus.UNPROCESSABLE_ENTITY: ErrorSchema # ?
     },
 )
 def deletar_usuario(form: UsuarioBuscaSchema):
@@ -170,24 +172,23 @@ def deletar_usuario(form: UsuarioBuscaSchema):
             success = True
 
         if success:
-            return {"message": const.SUCCESS_SQL_USER_DEL}, 200
+            return {"message": const.SUCCESS_SQL_USER_DEL}, HTTPStatus.OK
         else:
-            return {"message": const.ERROR_SQL_USER_WRONG_PASSWORD}, 401
+            return {"message": const.ERROR_SQL_USER_WRONG_PASSWORD}, HTTPStatus.UNAUTHORIZED
 
     except Exception as e:
         session.rollback()
-        return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, 400
+        return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, HTTPStatus.BAD_REQUEST
 
 
 @app.post(
     "/login",
     tags=[tag_user],
     responses={
-        "200": UsuarioSchema,
-        "409": ErrorSchema,
-        "400": ErrorSchema,
-        "401": ErrorSchema,
-        "404": ErrorSchema,
+        HTTPStatus.OK: UsuarioSchema,
+        HTTPStatus.UNAUTHORIZED: ErrorSchema,
+        HTTPStatus.NOT_FOUND: ErrorSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
     },
 )
 def logar(body: UsuarioBuscaSchema):
@@ -197,46 +198,48 @@ def logar(body: UsuarioBuscaSchema):
         usuario_encontrado = (
             session.query(Usuario).filter(Usuario.email == body.email).first()
         )
+
         if not usuario_encontrado:
-            return {"error": const.ERROR_SQL_USER_NOT_FOUND}, 404
+            return {"message": const.ERROR_SQL_USER_NOT_FOUND}, HTTPStatus.NOT_FOUND
 
         if usuario_encontrado.verificar_senha(body.senha_digitada):
             return {
-                "message": "Login realizado com sucesso",
+                "message": "Login realizado com sucesso", # <?> atualizar ocm constantes de string
                 "email": usuario_encontrado.email,
             }, 200
         else:
-            return {"error": const.ERROR_SQL_USER_WRONG_PASSWORD}, 401
+            return {
+                "message": const.ERROR_SQL_USER_WRONG_PASSWORD
+            }, HTTPStatus.UNAUTHORIZED
 
     except Exception as e:
         session.rollback()
-        return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, 400
+        return {
+            "message": f"{const.ERROR_SQL_USER_DEL} {str(e)}"
+        }, HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 @app.post(
     "/upload",
     tags=[tag_image],
     responses={
-        "200": UploadSchema,
-        "409": ErrorSchema,
-        "400": ErrorSchema,
-        "500": ErrorUploadSchema,
+        HTTPStatus.OK: UploadSchema,
+        HTTPStatus.UNSUPPORTED_MEDIA_TYPE:ErrorSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR:ErrorUploadSchema,
+        HTTPStatus.GATEWAY_TIMEOUT: ErrorUploadSchema
     },
 )
-def upload_imagem(form: UploadSchema):
+def upload_imagem(form: UploadSchema): # <?> rever e limpar comentarios
     """
     Recebe a imagem, valida, filtra e adiciona os produtos ao banco de dados.
     """
-    print(f"${datetime.now()} função upload_imagem em andamento.")
 
     file = form.imagem
     file.seek(0)
     image_bytes = file.read()
 
-    if not image_bytes:
-        return {"error": const.ERROR_EMPTY_IMAGE}, 400
-    if file.filename == "":
-        return {"error": const.ERROR_EMPTY_FILE}, 400
+    if not image_bytes or file.filename == "":  #
+        return {"message": const.ERROR_EMPTY_IMAGE}, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
     try:
         # 1. PROCESSAMENTO DA IA
@@ -245,7 +248,6 @@ def upload_imagem(form: UploadSchema):
 
         client = genai.Client(api_key=chave_api)
 
-        print(f"${datetime.now()} iniciando consulta com a IA")
         response = client.models.generate_content(
             model=const.GEMINI_MODEL,
             contents=[imagem_tratada, const.PROMPT],
@@ -254,20 +256,17 @@ def upload_imagem(form: UploadSchema):
                 response_schema=CupomExtraidoSchema,
                 temperature=0.1,
                 # http_options=HttpOptions(
-                #     timeout=30000
-                # ),  # timeout em milissegundos (ajuste conforme necessário)
+                #     timeout=30000clo
+                # ),  # timeout em milissegundos # precisa de mais tests
             ),
         )
         dados = response.parsed.model_dump()
 
-        print(f"${datetime.now()} Término da consulta com a IA")
-
     except Exception as e:
-        print(f"{datetime.now()} {const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}")
         return {
             "status": "erro",
             "message": f"{const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}",
-            "arquivo_recebido": file.filename,
+            "file": file.filename,
         }, HTTPStatus.GATEWAY_TIMEOUT
     finally:
         print(f"${datetime.now()} função upload_imagem finalizada.")
@@ -305,7 +304,8 @@ def upload_imagem(form: UploadSchema):
             "status": "sucesso",
             "message": f"{len(produtos_salvos)} {const.SUCCESS_SQL_PRODUCT_ADD}",
             "produtos_extraidos": dados["produtos"],
-        }, 200
+        }, HTTPStatus.OK
+        
     except Exception as e:
         session.rollback()
         print(f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}")
@@ -329,7 +329,7 @@ def upload_imagem(form: UploadSchema):
         "401": ErrorSchema,
     },
 )
-def listar_produtos():
+def listar_produtos(): # <?> rever completo
     """
     Retorna todos os produtos cadastrados no banco de dados
     """
@@ -415,21 +415,18 @@ def listar_produtos():
 
 @app.post(
     "/join_product",
-    tags=[tag_produtos],
+    tags=[tag_produtos],# <?> remover, marcar como teste ou terminar de implementar
     responses={
-        "200": UsuarioSchema,
+        HTTPStatus.OK: UsuarioSchema,
         "409": ErrorSchema,
         "400": ErrorSchema,
         "401": ErrorSchema,
     },
 )
-def juntar_produtos():
+def juntar_produtos(): 
 
     return 0
 
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)
-
-
-logger.info(f"Aplicação principal carregada")
