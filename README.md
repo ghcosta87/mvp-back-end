@@ -38,6 +38,31 @@ Abra o [http://localhost:5000/](http://localhost:5000/) no navegador para verifi
 2. Gere sua chave API
 3. Edite o arquivo em backend/.env com as credenciais da API
 
+## A ESTRUTURA
+```
+meu-mvp/
+│
+├── backend/
+│   ├── database/
+│   ├── logs/
+│   ├── model/
+│   ├── schemas/
+│   ├── service/
+│   ├── app.py
+│   ├── logger.py
+│   ├── README.md
+│   ├── requirements.txt
+│   └── Dockerfile       <-- (Configuração do container Python)
+│
+├── frontend/
+│   ├── js/
+│   ├── styles/
+│   ├── index.html
+│   └── Dockerfile       <-- (Configuração do container Nginx)
+│
+└── docker-compose.yml   <-- (O maestro que rege os dois)
+
+```
 # ➕ Extras 
 
 
@@ -47,7 +72,7 @@ mkdir precohub
 cd precohub
 git clone https://github.com/ghcosta87/mvp-back-end.git
 mv mvp-back-end backend
-
+ 
 git clone https://github.com/ghcosta87/mvp-front-end.git
 mv mvp-front-end frontend
 
