@@ -4,7 +4,12 @@ import os
 
 def configurar_logs():
     # 1. Garante que a pasta de logs existe
-    os.makedirs("logs", exist_ok=True)
+    # os.makedirs("logs", exist_ok=True)
+    log_path = "logs/"
+    if not os.path.exists(log_path):
+        print("pasta nao existe!")
+   # então cria o diretorio
+        os.makedirs(log_path)
 
     # 2. Define o formato universal
     formatter = logging.Formatter(
@@ -34,6 +39,3 @@ def configurar_logs():
     logging.getLogger("httpx").setLevel(logging.DEBUG)
     logging.getLogger("google.genai").setLevel(logging.DEBUG)
     logging.getLogger("PIL").setLevel(logging.DEBUG)
-
-# Executa a função imediatamente ao importar
-configurar_logs()

@@ -4,6 +4,7 @@
 import os
 import io
 import logging
+from logger import configurar_logs
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
@@ -175,6 +176,8 @@ def deletar_usuario(form: UsuarioBuscaSchema):
 )
 def logar(form: UsuarioBuscaSchema):
     """Verifica se o usuário existe e se a senha está correta e retorna uma mensagem de sucesso ou erro."""
+    # logging.info("Email recebido")
+    # logging.info(form.email)
     try:
         session = Session()
         usuario_encontrado = (
