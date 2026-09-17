@@ -3,10 +3,12 @@
 # ==========================================
 import os
 import io
-import logging
 from logging.handlers import RotatingFileHandler
-from sqlite3 import IntegrityError
+import logger
+import logging
+# from sqlite3 import IntegrityError
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 # import warnings
 from datetime import date, datetime
@@ -25,9 +27,10 @@ from flask_openapi3 import OpenAPI, Info, Tag
 # Inteligência Artificial (Google Gemini)
 from google import genai
 from google.genai.types import GenerateContentConfig, HttpOptions
+from httpx import TimeoutException
 
 # Imagens e Conversões
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 
 from http import HTTPStatus
@@ -46,7 +49,7 @@ from model.estabelecimento import Estabelecimento
 
 # Schemas (Validação de Dados)
 from schemas.usuarios import UsuarioSchema, UsuarioBuscaSchema, apresenta_usuario
-from schemas.produto import CupomExtraidoSchema, ProdutoSchema
+from schemas.produto import CupomExtraidoSchema, ProdutoSchema, ConsultaSchema
 from schemas.upload import UploadSchema
 from schemas.error import ErrorSchema, ErrorUploadSchema
 
@@ -69,38 +72,16 @@ tag_home = Tag(
 load_dotenv(find_dotenv())
 chave_api = os.getenv("API_KEY")
 
-# warnings.filterwarnings("ignore", message=".*automatic function calling.*")
-from logger import logger
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        RotatingFileHandler(
-            "logs/debug.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
-        )
-    ],
-)
-logging.getLogger("google.genai").setLevel(logging.DEBUG)
-logging.getLogger("httpx").setLevel(logging.DEBUG)
-logging.getLogger("httpcore").setLevel(logging.DEBUG)
-logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
-
 register_heif_opener()  # Liga o suporte a HEIC dentro do Pillow
 
 info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
 CORS(app)
 
-logger.info(f"Aplicatição iniciada")
-
-
 @app.get("/", tags=[tag_home])
 def home():
     """Redireciona para /openapi, tela que permite a escolha do estilo de documentação."""
     return redirect("/openapi")
-
 
 @app.post(
     "/adicionar_usuario",
@@ -131,25 +112,28 @@ def add_usuario(form: UsuarioSchema):
         session.add(usuario)
         session.commit()
         return apresenta_usuario(usuario), HTTPStatus.OK
+    
     except IntegrityError:
+        session.rollback()
         return {
-            "message": "CPF, E-mail ou Telefone já cadastrados." # <?> adicionar constant de texto
+            "message": const.ERROR_SQL_USER_ALREADY_IN_DATABASE
         }, HTTPStatus.CONFLICT
+        
     except Exception as e:
-        return {"message": str(e)}, HTTPStatus.BAD_REQUEST
+        session.rollback()
+        return {"message": const.ERROR_SQL_UNKNOWN}, HTTPStatus.BAD_REQUEST
+    
     finally:
         session.close()
 
-
-@app.post( # <?> atualizar as respostas dos esquemas
+@app.post( 
     "/deletar_usuario",
     tags=[tag_user],
     responses={
         HTTPStatus.OK: UsuarioSchema,
-        HTTPStatus.BAD_REQUEST: ErrorSchema,
-        HTTPStatus.UNAUTHORIZED: ErrorSchema,
-        HTTPStatus.CONFLICT: ErrorSchema, # ?
-        HTTPStatus.UNPROCESSABLE_ENTITY: ErrorSchema # ?
+        HTTPStatus.BAD_REQUEST: ErrorSchema, # somente se o tiver problemas na base de dados
+        HTTPStatus.UNAUTHORIZED: ErrorSchema, # erro de senha
+        HTTPStatus.NOT_FOUND: ErrorSchema, # somente se o usuario forçar o login
     },
 )
 def deletar_usuario(form: UsuarioBuscaSchema):
@@ -163,12 +147,11 @@ def deletar_usuario(form: UsuarioBuscaSchema):
         )
 
         if not usuario_encontrado:
-            return {"error": const.ERROR_SQL_USER_NOT_FOUND}, HTTPStatus.NOT_FOUND
+            return {"message": const.ERROR_SQL_USER_NOT_FOUND}, HTTPStatus.NOT_FOUND
 
         if usuario_encontrado.verificar_senha(form.senha_digitada):
             session.delete(usuario_encontrado)
             session.commit()
-            session.close()
             success = True
 
         if success:
@@ -178,35 +161,38 @@ def deletar_usuario(form: UsuarioBuscaSchema):
 
     except Exception as e:
         session.rollback()
-        return {"error": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, HTTPStatus.BAD_REQUEST
+        return {"message": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, HTTPStatus.BAD_REQUEST
 
+    finally:
+        session.close()
 
 @app.post(
     "/login",
     tags=[tag_user],
     responses={
         HTTPStatus.OK: UsuarioSchema,
+        HTTPStatus.BAD_REQUEST: ErrorSchema,
         HTTPStatus.UNAUTHORIZED: ErrorSchema,
-        HTTPStatus.NOT_FOUND: ErrorSchema,
-        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
+        HTTPStatus.NOT_FOUND: ErrorSchema        
     },
 )
-def logar(body: UsuarioBuscaSchema):
+def logar(form: UsuarioBuscaSchema):
     """Verifica se o usuário existe e se a senha está correta e retorna uma mensagem de sucesso ou erro."""
     try:
         session = Session()
         usuario_encontrado = (
-            session.query(Usuario).filter(Usuario.email == body.email).first()
+            session.query(Usuario).filter(Usuario.email == form.email).first()
         )
 
         if not usuario_encontrado:
+            logging.info(form.email)
             return {"message": const.ERROR_SQL_USER_NOT_FOUND}, HTTPStatus.NOT_FOUND
 
-        if usuario_encontrado.verificar_senha(body.senha_digitada):
+        if usuario_encontrado.verificar_senha(form.senha_digitada):
             return {
-                "message": "Login realizado com sucesso", # <?> atualizar ocm constantes de string
+                "message": const.SUCCESS_LOGIN_AUTHORIZED,
                 "email": usuario_encontrado.email,
-            }, 200
+            }, HTTPStatus.OK
         else:
             return {
                 "message": const.ERROR_SQL_USER_WRONG_PASSWORD
@@ -216,14 +202,16 @@ def logar(body: UsuarioBuscaSchema):
         session.rollback()
         return {
             "message": f"{const.ERROR_SQL_USER_DEL} {str(e)}"
-        }, HTTPStatus.INTERNAL_SERVER_ERROR
-
+        }, HTTPStatus.BAD_REQUEST
+    finally:
+        session.close()
 
 @app.post(
     "/upload",
     tags=[tag_image],
     responses={
         HTTPStatus.OK: UploadSchema,
+        HTTPStatus.LENGTH_REQUIRED:ErrorUploadSchema,
         HTTPStatus.UNSUPPORTED_MEDIA_TYPE:ErrorSchema,
         HTTPStatus.INTERNAL_SERVER_ERROR:ErrorUploadSchema,
         HTTPStatus.GATEWAY_TIMEOUT: ErrorUploadSchema
@@ -255,21 +243,36 @@ def upload_imagem(form: UploadSchema): # <?> rever e limpar comentarios
                 response_mime_type="application/json",
                 response_schema=CupomExtraidoSchema,
                 temperature=0.1,
-                # http_options=HttpOptions(
-                #     timeout=30000clo
-                # ),  # timeout em milissegundos # precisa de mais tests
+                http_options=HttpOptions(
+                    timeout=const.GEMINI_MAX_WAITING_TIME
+                ), 
             ),
         )
         dados = response.parsed.model_dump()
 
+    except UnidentifiedImageError as err:
+        logging.error(const.IMAGE_NOT_COMPATIBLE)
+        return {
+                    "status": "erro",
+                    "message": const.ERROR_GEMINI_WRONG_FORMAT,
+                    "arquivo": file.filename,
+                }, HTTPStatus.UNSUPPORTED_MEDIA_TYPE       
+        
+    except TimeoutException as err:
+        logging.error(const.GEMINI_NOT_RESPONDING)
+        return {
+                    "status": "erro",
+                    "message": const.ERROR_GEMINI_TIMEOUT,
+                    "arquivo": file.filename,
+                }, HTTPStatus.GATEWAY_TIMEOUT       
+        
     except Exception as e:
+        logging.error("Erro desconhecido...")
         return {
             "status": "erro",
             "message": f"{const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}",
             "file": file.filename,
-        }, HTTPStatus.GATEWAY_TIMEOUT
-    finally:
-        print(f"${datetime.now()} função upload_imagem finalizada.")
+        }, HTTPStatus.INTERNAL_SERVER_ERROR
 
     # 2. SALVAMENTO NO BANCO DE DADOS
     session = Session()
@@ -278,13 +281,15 @@ def upload_imagem(form: UploadSchema): # <?> rever e limpar comentarios
     try:
         if "loja" in dados:
             loja_dados = dados["loja"]
-            loja = Estabelecimento(
-                None,
-                loja_dados["nome"],
-                loja_dados["descricao"],
-                loja_dados["endereco"],
-            )
-            session.add(loja)
+            lojaDuplicada=session.query(Estabelecimento).filter_by(endereco=loja_dados["endereco"]).first()
+            if not lojaDuplicada:
+                loja = Estabelecimento(
+                    None,
+                    loja_dados["nome"],
+                    loja_dados["descricao"],
+                    loja_dados["endereco"],
+                )
+                session.add(loja)
 
         for item in dados["produtos"]:
             produto = Produto(
@@ -292,67 +297,63 @@ def upload_imagem(form: UploadSchema): # <?> rever e limpar comentarios
                 nome=item["nome"],
                 marca=item.get(
                     "marca", "Sem marca"
-                ),  # Fallback seguro caso a IA não encontre
+                ), 
                 data_da_compra=item.get("data", datetime.now()),
                 preco=item["preco"],
             )
             session.add(produto)
             produtos_salvos.append(produto.nome)
-
+        
+        if not len(produtos_salvos):            
+            logging.error(const.PRODUCT_NOT_FOUND)
+            return{
+                    "status": "erro",
+                    "message": f"{len(produtos_salvos)} {const.ERROR_SQL_ADD_FROM_IMAGE}",
+                    "arquivo": file.filename
+                }, HTTPStatus.LENGTH_REQUIRED
+                     
         session.commit()
         return {
             "status": "sucesso",
             "message": f"{len(produtos_salvos)} {const.SUCCESS_SQL_PRODUCT_ADD}",
             "produtos_extraidos": dados["produtos"],
         }, HTTPStatus.OK
-        
+                
     except Exception as e:
         session.rollback()
-        print(f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}")
-        print(f"lista de produtos extraídos: {dados['produtos']}")
         return {
             "status": "erro",
-            "message": f"{const.ERROR_SQL_PRODUCT_ADD} {str(e)}",
-            "arquivo": file.filename,
-        }, HTTPStatus.INTERNAL_SERVER_ERROR
-    finally:
+            "message": f"{const.ERROR_SQL_UNKNOWN} {str(e)}",
+            "arquivo": file.filename
+        }, HTTPStatus.BAD_REQUEST
+        
+    finally:        
         session.close()
-
 
 @app.get(
     "/produtos",
     tags=[tag_produtos],
     responses={
-        "200": ProdutoSchema,
-        "409": ErrorSchema,
-        "400": ErrorSchema,
-        "401": ErrorSchema,
+        HTTPStatus.OK: ConsultaSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema
     },
 )
-def listar_produtos(): # <?> rever completo
+def listar_produtos():
     """
     Retorna todos os produtos cadastrados no banco de dados
     """
-    logger.info(f"Requisição recebida em /produtos")
-
-    lista_produtos = []
-
     try:
         session = Session()
-        logger.info(f"Iniciada secção do banco de dados")
-
-        produtos_db = session.query(Produto).all()
-
-        for produto in produtos_db:
-            lista_produtos.append(
-                {
-                    "id": produto.id,
-                    "nome": produto.nome,
-                    "data_da_compra": produto.data_da_compra,
-                    "preco": float(produto.preco),
-                }
-            )
-
+        
+        lista_produtos=[{
+                         "id": produto.id,
+                         "nome": produto.nome,
+                         "data_da_compra": produto.data_da_compra,
+                         "preco": float(produto.preco)
+            }
+            for produto in session.query(Produto).all()
+        ]
+        
         resultados = (
             session.query(
                 Produto.nome,
@@ -394,39 +395,14 @@ def listar_produtos(): # <?> rever completo
                     "valor": float(linha.preco),
                 }
             )
-
-        # return {"estatisticas": dados_formatados}, 200
-
-        logger.info(f"Fechando banco de dados")
-        session.close()
-        logger.info(f"Termino da função listar_produtos sem erros")
-
+        
         return {
             "produtos": lista_produtos,
             "estatisticas": resultado_formatados,
             "historico": historico_agrupado,
-        }, 200
+        }, HTTPStatus.OK
 
     except Exception as e:
-
-        logger.error(f"O Python reclamou disso: {str(e)}, retornando código 500")
-        return {"error": f"O Python reclamou disso: {str(e)}"}, 500
-
-
-@app.post(
-    "/join_product",
-    tags=[tag_produtos],# <?> remover, marcar como teste ou terminar de implementar
-    responses={
-        HTTPStatus.OK: UsuarioSchema,
-        "409": ErrorSchema,
-        "400": ErrorSchema,
-        "401": ErrorSchema,
-    },
-)
-def juntar_produtos(): 
-
-    return 0
-
-
-if __name__ == "__main__":
-    app.run(debug=True, threaded=True)
+        return {"error": f"{const.ERROR_SQL_UNKNOWN}: {str(e)}"}, HTTPStatus.INTERNAL_SERVER_ERROR
+    
+    finally: session.close()

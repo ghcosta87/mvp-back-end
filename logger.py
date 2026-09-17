@@ -2,26 +2,38 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
-# Garante que a pasta de logs existe
-os.makedirs("logs", exist_ok=True)
+def configurar_logs():
+    # 1. Garante que a pasta de logs existe
+    os.makedirs("logs", exist_ok=True)
 
-logger = logging.getLogger("app")
-logger.setLevel(logging.DEBUG)
+    # 2. Define o formato universal
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | [%(name)-24s] | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
-# Formato: data/hora, nível, mensagem
-formatter = logging.Formatter(
-    "%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
+    # 3. Handler de Arquivo
+    file_handler = RotatingFileHandler(
+        "logs/backend.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
+    )
+    file_handler.setFormatter(formatter)
 
-# Salva em arquivo, rotacionando quando passar de 5MB (evita arquivo gigante)
-file_handler = RotatingFileHandler(
-    "logs/app.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
-)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+    # 4. Handler de Terminal
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
 
-# Também mostra no terminal, como você já tem hoje
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+    # 5. Root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG) # Captura absolutamente TUDO
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
+    # 6. Filtros Específicos
+    logging.getLogger("werkzeug").setLevel(logging.DEBUG) 
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
+    logging.getLogger("httpx").setLevel(logging.DEBUG)
+    logging.getLogger("google.genai").setLevel(logging.DEBUG)
+    logging.getLogger("PIL").setLevel(logging.DEBUG)
+
+# Executa a função imediatamente ao importar
+configurar_logs()

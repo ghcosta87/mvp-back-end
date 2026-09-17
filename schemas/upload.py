@@ -1,10 +1,4 @@
 from pydantic import BaseModel
-
-# ❌ APAGUE a linha antiga do Werkzeug e o ConfigDict:
-# from pydantic import ConfigDict
-# from werkzeug.datastructures import FileStorage
-
-# ✅ ADICIONE a importação oficial do flask_openapi3:
 from flask_openapi3 import FileStorage
 
 class UploadSchema(BaseModel):

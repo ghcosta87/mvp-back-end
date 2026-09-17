@@ -1,6 +1,6 @@
 # 🛍️ MVP - Preço Hub - Preços de Supermercado unificados - Backend
 
-Este projeto é um MVP (Minimum Viable Product) com foco no acompanhamento da gestão de preços de itens de Supermercado. A aplicação centraliza armazena dados de produtos, capaz de registrar e calcular a média de variação de preços dos produtos ao longo do tempo.
+Este projeto é um MVP (Minimum Viable Product) com foco no acompanhamento da gestão de preços de itens de Supermercado. A aplicação centraliza e armazena preços dos produtos, registra e calcula a média de variação de preços dos produtos ao longo do tempo.
 
 > **Contexto Acadêmico:** Este projeto faz parte do escopo de avaliação e material didático da disciplina **Desenvolvimento Full Stack Básico**. O objetivo principal é ilustrar e aplicar na prática os conceitos arquiteturais e de código apresentados ao longo das aulas.
 
@@ -9,18 +9,16 @@ Este projeto é um MVP (Minimum Viable Product) com foco no acompanhamento da ge
 ## 🛠️ Tecnologias Utilizadas
 
 * **Backend:** Python + Flask
-* **Frontend:** HTML5, CSS3, Bootstrap
 * **Ambiente Isolado:** Virtualenv (`mvp`)
 
----
+
 
 ## 🔗 Links
 
 ### Olá, seguem os dados referentes à entrega do meu MVP.
 
 - Link para o vídeo: [https://www.youtube.com/](https://www.youtube.com/) 
-- Link para o repositório do back-end: [https://github.com/seu-usuario/back-end](https://github.com/seu-usuario/back-end)
-- Link para o repositório do front-end: [https://github.com/seu-usuario/front-end](https://github.com/seu-usuario/front-end)
+- Link para o repositório do back-end: [https://github.com/ghcosta87/mvp-back-end.git](https://github.com/ghcosta87/mvp-back-end.git)
 
 
 ## 🚀 Como executar o projeto na sua máquina
@@ -35,11 +33,13 @@ flask run --host 0.0.0.0 --port 5000
 ```
 Abra o [http://localhost:5000/](http://localhost:5000/) no navegador para verificar o status da API em execução com o Swagger.
 
-### Frontend
-```bash
-git clone https://github.com/ghcosta87/mvp-front-end.git
-```
-Abra o arquivo `index.html` com navegador de sua preferência
+## 🤖 CONFIGURAR API DO GEMINI
+1. Acesse o link [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2. Gere sua chave API
+3. Edite o arquivo em backend/.env com as credenciais da API
+
+# ➕ Extras 
+
 
 ## 🖥️ CONFIGURANDO PARA SELF HOSTING 
 ```bash
@@ -97,69 +97,21 @@ echo 'PROJECT_NUMBER=""' >> backend/.env
 nano backend/.env
 
 docker compose up -d
+```
+Através do navegador de sua preferência digite o ip-da-maquina:35112
 
+## BUGS CONHECIDOS
+```
+- [        ] se apagar a base de dados é possivel logar e ver os dados que ficaram salvos
+- [ SOLVED ] reformular filehandler, está muito bagunçado e duplicado
+- [        ] login forçado via console libera função GET para puxar os dados do backend
 ```
 
-## 🤖 CONFIGURAR API DO GEMINI
-1. Acesse o link ()[] 
-2. Gere sua chave API
-3. Edite o arquivo em backend/.env com as credenciais da API
-
-## ‼️ COMO ATUALIZAR
-Na pasta pasta raiz "precohub":
-```bash
-docker compose down --rmi all
-
-mv backend/.env .env
-mv backend/database/db.sqlite3 db.sqlite3
-
-rm -Rf backend
-
-git clone https://github.com/ghcosta87/mvp-back-end.git
-mv mvp-back-end backend
-cp .Dockerfile-backend backend/Dockerfile
-
-git clone https://github.com/ghcosta87/mvp-front-end.git
-mv mvp-front-end frontend
-cp .Dockerfile-backend backend/Dockerfile
-nano frontend/js/constantes.js
-
-docker compose build
-
-mv db.sqlite3 backend/database/db.sqlite3
-mv .env backend/.env
-
-docker compose up -d
-
+## FUTURAS ATUALIZAÇÕES
 ```
-## BUGS
-- [ ] se apagar a base de dados é possivel logar e ver os dados que ficaram salvos
-- [ ] cadastro concluido com sucesso está retornando erro no toast
-- [ ] modal fica aberto na pagina inicial
-- [ ] algumas vezes o aviso "toast" fica somente em vermelho
-- [ ] ao anexar o arquivo o sidebar não esconde
-- [ ] avisos do painel nao estao centralizados
-- [ ] botao voltar na janela de cadastro esta sem fade ao passar o mouse
-- [ ] precisa alterar a resposta para receber o nome do usuário, e não o email
-- [ ] precisa rever função "renderizarLista" "filtrarProdutos"
-- [ ] preciso entender melhor o filehandler, está muito bagunçado
-
-## FEAT REQUEST
-- [ ] botao no alto a direita pra trocar o tema, com apenas um icone
-- [ ] adicionar o spinner de loading no botao de cadastro
-- [ ] passar texto simulando chat da AI abaixo da barra de pesquisaq
-- [ ] criar fila de envio
-- [ ] permitir guardar as fotos
-- [ ] criar página inicial acima de todas para indicar o carregamento
-
-
-## CHECKLIST PRE ENTREGA
-### Backend
-```python
-# Testes de POST deletar_usuario
-HTTPStatus.OK                     # 200  # ✅
-HTTPStatus.BAD_REQUEST            # 400  # 
-HTTPStatus.UNAUTHORIZED           # 401  # ✅
-HTTPStatus.CONFLICT               # 409  #
-HTTPStatus.UNPROCESSABLE_ENTITY   # 422  # 
+- [        ] criar fila de envio
+- [        ] permitir guardar as fotos
+- [        ] juntar produtos identicos com nomes diferentes
+- [        ] cadastro manual de produtos
+- [        ] envio de informações das lojas
 ```

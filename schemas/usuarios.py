@@ -25,7 +25,7 @@ class UsuarioBuscaSchema(BaseModel):
         feita apenas com base no nome do usuário.
     """
     email: str = "gabriel.silva@example.com"
-    senha_digitada: str = "senha123"
+    senha_digitada: str = "123"
     
     @field_validator('senha_digitada', mode='before')
     @classmethod
@@ -52,4 +52,26 @@ def apresenta_usuario(usuario: Usuario):
         "data_de_cadastro": usuario.data_de_cadastro.isoformat() #if usuario.data_de_cadastro else None
     }
     
-    
+# ==========================================
+# ÁREA DE TESTES E PROJETOS FUTUROS
+# ==========================================
+# 1. implementação de token para proteger o backend    
+from functools import wraps
+from flask import request
+
+def login_obrigatorio(funcao):
+    @wraps(funcao)
+    def wrapper(*args, **kwargs):
+        token = request.headers.get("Authorization")
+
+        if not token:
+            return {"error": "Não autenticado."}, HTTPStatus.UNAUTHORIZED
+
+        token = token.replace("Bearer ", "")
+
+        usuario = validar_token(token)  # sua função de validação de JWT
+        if not usuario:
+            return {"error": "Token inválido ou expirado."}, HTTPStatus.UNAUTHORIZED
+
+        return funcao(*args, **kwargs)
+    return wrapper
