@@ -3,10 +3,7 @@
 # ==========================================
 import os
 import io
-from logging.handlers import RotatingFileHandler
-import logger
 import logging
-# from sqlite3 import IntegrityError
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
