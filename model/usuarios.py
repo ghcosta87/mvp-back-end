@@ -51,13 +51,3 @@ class Usuario(Base):
         Retorna True se estiver correta, False se estiver errada.
         """
         return check_password_hash(self.senha, senha_digitada)
-    
-    # def apagar_usuario(self,senha_digitada: str):
-    #     """
-    #     Apaga o usuário do banco de dados.
-    #     """
-    #     from model import Session  # Importa a sessão do SQLAlchemy
-
-    #     session = Session()
-    #     session.delete(self)
-    #     session.commit()

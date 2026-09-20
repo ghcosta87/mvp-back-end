@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from model.estabelecimento import Estabelecimento
+# from typing import Optional, List
+# from model.estabelecimento import Estabelecimento
 
 from datetime import datetime
 

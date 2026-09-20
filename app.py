@@ -4,8 +4,9 @@
 import os
 import io
 import logging
-from logger import configurar_logs
-from sqlalchemy import func
+from logger import configurar_logs, log_execucao
+from service.listas import check_duplicate, return_error
+from sqlalchemy import JSON, func
 from sqlalchemy.exc import IntegrityError
 
 # import warnings
@@ -42,17 +43,27 @@ import model.constants as const
 # Banco de Dados
 from model import Session
 from model.produto import Produto
+from model.lista import ListaDeCompras, ListaDeItens
 from model.usuarios import Usuario
 from model.estabelecimento import Estabelecimento
 
 # Schemas (Validação de Dados)
 from schemas.usuarios import UsuarioSchema, UsuarioBuscaSchema, apresenta_usuario
 from schemas.produto import CupomExtraidoSchema, ProdutoSchema, ConsultaSchema
+from schemas.listas import (
+    ApagarItemDaLista,
+    ListReplySchema,
+    BuscarListaDeCompras,
+    CriarListaDeCompras,
+    ListaDeComprasSchema,
+    ProdutoAdicionadoNaLista,
+    ListErrorSchema,
+)
 from schemas.upload import UploadSchema
 from schemas.error import ErrorSchema, ErrorUploadSchema
 
 # ==========================================
-# DEFINIÇÃO DAS HOME TAGS
+# 2. DEFINIÇÃO DAS HOME TAGS
 # ==========================================
 tag_user = Tag(name="Usuários", description="Funções de controle de usuários")
 tag_image = Tag(
@@ -62,10 +73,19 @@ tag_produtos = Tag(name="Produtos", description="Funções de listagem de produt
 tag_home = Tag(
     name="Home", description="Função de redirecionamento para a documentação da API"
 )
+tag_listas = Tag(
+    name="Listas", description="Função de mansipulação das listas de compras"
+)
+tag_dev = Tag(
+    name="Desenvolvimento", description="Área de testes e desenvolvimento de rotas"
+)
 
 # ==========================================
-# CONFIGURAÇÕES GLOBAIS
+# 3. CONFIGURAÇÕES GLOBAIS
 # ==========================================
+
+configurar_logs()
+logging.info("\n\n")
 
 load_dotenv(find_dotenv())
 chave_api = os.getenv("API_KEY")
@@ -76,10 +96,22 @@ info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
 CORS(app)
 
+
+####################################
+######## → Homepage do Swagger
+####
+
+
 @app.get("/", tags=[tag_home])
 def home():
     """Redireciona para /openapi, tela que permite a escolha do estilo de documentação."""
     return redirect("/openapi")
+
+
+#####################################
+######## 1. Manipulação de Usuários
+####
+
 
 @app.post(
     "/adicionar_usuario",
@@ -110,28 +142,27 @@ def add_usuario(form: UsuarioSchema):
         session.add(usuario)
         session.commit()
         return apresenta_usuario(usuario), HTTPStatus.OK
-    
+
     except IntegrityError:
         session.rollback()
         return {
             "message": const.ERROR_SQL_USER_ALREADY_IN_DATABASE
         }, HTTPStatus.CONFLICT
-        
-    except Exception as e:
-        session.rollback()
-        return {"message": const.ERROR_SQL_UNKNOWN}, HTTPStatus.BAD_REQUEST
-    
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
     finally:
         session.close()
 
-@app.post( 
+
+@app.post(
     "/deletar_usuario",
     tags=[tag_user],
     responses={
         HTTPStatus.OK: UsuarioSchema,
-        HTTPStatus.BAD_REQUEST: ErrorSchema, # somente se o tiver problemas na base de dados
-        HTTPStatus.UNAUTHORIZED: ErrorSchema, # erro de senha
-        HTTPStatus.NOT_FOUND: ErrorSchema, # somente se o usuario forçar o login
+        HTTPStatus.BAD_REQUEST: ErrorSchema,  # somente se o tiver problemas na base de dados
+        HTTPStatus.UNAUTHORIZED: ErrorSchema,  # erro de senha
+        HTTPStatus.NOT_FOUND: ErrorSchema,  # somente se o usuario forçar o login
     },
 )
 def deletar_usuario(form: UsuarioBuscaSchema):
@@ -155,14 +186,15 @@ def deletar_usuario(form: UsuarioBuscaSchema):
         if success:
             return {"message": const.SUCCESS_SQL_USER_DEL}, HTTPStatus.OK
         else:
-            return {"message": const.ERROR_SQL_USER_WRONG_PASSWORD}, HTTPStatus.UNAUTHORIZED
+            return {
+                "message": const.ERROR_SQL_USER_WRONG_PASSWORD
+            }, HTTPStatus.UNAUTHORIZED
 
-    except Exception as e:
-        session.rollback()
-        return {"message": f"{const.ERROR_SQL_USER_DEL} {str(e)}"}, HTTPStatus.BAD_REQUEST
+    except Exception as e: return return_error(ErrorSchema,e,session)
 
     finally:
         session.close()
+
 
 @app.post(
     "/login",
@@ -171,7 +203,7 @@ def deletar_usuario(form: UsuarioBuscaSchema):
         HTTPStatus.OK: UsuarioSchema,
         HTTPStatus.BAD_REQUEST: ErrorSchema,
         HTTPStatus.UNAUTHORIZED: ErrorSchema,
-        HTTPStatus.NOT_FOUND: ErrorSchema        
+        HTTPStatus.NOT_FOUND: ErrorSchema,
     },
 )
 def logar(form: UsuarioBuscaSchema):
@@ -180,9 +212,7 @@ def logar(form: UsuarioBuscaSchema):
     # logging.info(form.email)
     try:
         session = Session()
-        usuario_encontrado = (
-            session.query(Usuario).filter(Usuario.email == form.email).first()
-        )
+        usuario_encontrado = session.query(Usuario).filter_by(email=form.email).first()
 
         if not usuario_encontrado:
             logging.info(form.email)
@@ -198,144 +228,23 @@ def logar(form: UsuarioBuscaSchema):
                 "message": const.ERROR_SQL_USER_WRONG_PASSWORD
             }, HTTPStatus.UNAUTHORIZED
 
-    except Exception as e:
-        session.rollback()
-        return {
-            "message": f"{const.ERROR_SQL_USER_DEL} {str(e)}"
-        }, HTTPStatus.BAD_REQUEST
+    except Exception as e: return return_error(ErrorSchema,e,session)
+    
     finally:
         session.close()
 
-@app.post(
-    "/upload",
-    tags=[tag_image],
-    responses={
-        HTTPStatus.OK: UploadSchema,
-        HTTPStatus.LENGTH_REQUIRED:ErrorUploadSchema,
-        HTTPStatus.UNSUPPORTED_MEDIA_TYPE:ErrorSchema,
-        HTTPStatus.INTERNAL_SERVER_ERROR:ErrorUploadSchema,
-        HTTPStatus.GATEWAY_TIMEOUT: ErrorUploadSchema
-    },
-)
-def upload_imagem(form: UploadSchema): # <?> rever e limpar comentarios
-    """
-    Recebe a imagem, valida, filtra e adiciona os produtos ao banco de dados.
-    """
 
-    file = form.imagem
-    file.seek(0)
-    image_bytes = file.read()
+#####################################
+######## 2. Manipulação de Produtos
+####
 
-    if not image_bytes or file.filename == "":  #
-        return {"message": const.ERROR_EMPTY_IMAGE}, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
-
-    try:
-        # 1. PROCESSAMENTO DA IA
-        imagem_original = Image.open(io.BytesIO(image_bytes))
-        imagem_tratada = imagem_original.convert("RGB")
-
-        client = genai.Client(api_key=chave_api)
-
-        response = client.models.generate_content(
-            model=const.GEMINI_MODEL,
-            contents=[imagem_tratada, const.PROMPT],
-            config=GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=CupomExtraidoSchema,
-                temperature=0.1,
-                http_options=HttpOptions(
-                    timeout=const.GEMINI_MAX_WAITING_TIME
-                ), 
-            ),
-        )
-        dados = response.parsed.model_dump()
-
-    except UnidentifiedImageError as err:
-        logging.error(const.IMAGE_NOT_COMPATIBLE)
-        return {
-                    "status": "erro",
-                    "message": const.ERROR_GEMINI_WRONG_FORMAT,
-                    "arquivo": file.filename,
-                }, HTTPStatus.UNSUPPORTED_MEDIA_TYPE       
-        
-    except TimeoutException as err:
-        logging.error(const.GEMINI_NOT_RESPONDING)
-        return {
-                    "status": "erro",
-                    "message": const.ERROR_GEMINI_TIMEOUT,
-                    "arquivo": file.filename,
-                }, HTTPStatus.GATEWAY_TIMEOUT       
-        
-    except Exception as e:
-        logging.error("Erro desconhecido...")
-        return {
-            "status": "erro",
-            "message": f"{const.ERROR_GEMINI_IMAGE_PROCESS} {str(e)}",
-            "file": file.filename,
-        }, HTTPStatus.INTERNAL_SERVER_ERROR
-
-    # 2. SALVAMENTO NO BANCO DE DADOS
-    session = Session()
-    produtos_salvos = []
-
-    try:
-        if "loja" in dados:
-            loja_dados = dados["loja"]
-            lojaDuplicada=session.query(Estabelecimento).filter_by(endereco=loja_dados["endereco"]).first()
-            if not lojaDuplicada:
-                loja = Estabelecimento(
-                    None,
-                    loja_dados["nome"],
-                    loja_dados["descricao"],
-                    loja_dados["endereco"],
-                )
-                session.add(loja)
-
-        for item in dados["produtos"]:
-            produto = Produto(
-                id=None,
-                nome=item["nome"],
-                marca=item.get(
-                    "marca", "Sem marca"
-                ), 
-                data_da_compra=item.get("data", datetime.now()),
-                preco=item["preco"],
-            )
-            session.add(produto)
-            produtos_salvos.append(produto.nome)
-        
-        if not len(produtos_salvos):            
-            logging.error(const.PRODUCT_NOT_FOUND)
-            return{
-                    "status": "erro",
-                    "message": f"{len(produtos_salvos)} {const.ERROR_SQL_ADD_FROM_IMAGE}",
-                    "arquivo": file.filename
-                }, HTTPStatus.LENGTH_REQUIRED
-                     
-        session.commit()
-        return {
-            "status": "sucesso",
-            "message": f"{len(produtos_salvos)} {const.SUCCESS_SQL_PRODUCT_ADD}",
-            "produtos_extraidos": dados["produtos"],
-        }, HTTPStatus.OK
-                
-    except Exception as e:
-        session.rollback()
-        return {
-            "status": "erro",
-            "message": f"{const.ERROR_SQL_UNKNOWN} {str(e)}",
-            "arquivo": file.filename
-        }, HTTPStatus.BAD_REQUEST
-        
-    finally:        
-        session.close()
 
 @app.get(
     "/produtos",
     tags=[tag_produtos],
     responses={
         HTTPStatus.OK: ConsultaSchema,
-        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
     },
 )
 def listar_produtos():
@@ -344,16 +253,17 @@ def listar_produtos():
     """
     try:
         session = Session()
-        
-        lista_produtos=[{
-                         "id": produto.id,
-                         "nome": produto.nome,
-                         "data_da_compra": produto.data_da_compra,
-                         "preco": float(produto.preco)
+
+        lista_produtos = [
+            {
+                "id": produto.id,
+                "nome": produto.nome,
+                "data_da_compra": produto.data_da_compra,
+                "preco": float(produto.preco),
             }
             for produto in session.query(Produto).all()
         ]
-        
+
         resultados = (
             session.query(
                 Produto.nome,
@@ -395,14 +305,526 @@ def listar_produtos():
                     "valor": float(linha.preco),
                 }
             )
-        
+
         return {
             "produtos": lista_produtos,
             "estatisticas": resultado_formatados,
             "historico": historico_agrupado,
         }, HTTPStatus.OK
 
-    except Exception as e:
-        return {"error": f"{const.ERROR_SQL_UNKNOWN}: {str(e)}"}, HTTPStatus.INTERNAL_SERVER_ERROR
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    finally:
+        session.close()
+
+
+#####################################
+######## 3. Manipulação de Imagem
+####
+
+
+@app.post(
+    "/upload",
+    tags=[tag_image],
+    responses={
+        HTTPStatus.OK: UploadSchema,
+        HTTPStatus.LENGTH_REQUIRED: ErrorUploadSchema,
+        HTTPStatus.UNSUPPORTED_MEDIA_TYPE: ErrorSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorUploadSchema,
+        HTTPStatus.GATEWAY_TIMEOUT: ErrorUploadSchema,
+    },
+)
+def upload_imagem(form: UploadSchema):  # <?> rever e limpar comentarios
+    """
+    Recebe a imagem, valida, filtra e adiciona os produtos ao banco de dados.
+    """
+
+    file = form.imagem
+    file.seek(0)
+    image_bytes = file.read()
+
+    if not image_bytes or file.filename == "":  #
+        return {"message": const.ERROR_EMPTY_IMAGE}, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+
+    try:
+        # 1. PROCESSAMENTO DA IA
+        imagem_original = Image.open(io.BytesIO(image_bytes))
+        imagem_tratada = imagem_original.convert("RGB")
+
+        client = genai.Client(api_key=chave_api)
+
+        response = client.models.generate_content(
+            model=const.GEMINI_MODEL,
+            contents=[imagem_tratada, const.PROMPT],
+            config=GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=CupomExtraidoSchema,
+                temperature=0.1,
+                http_options=HttpOptions(timeout=const.GEMINI_MAX_WAITING_TIME),
+            ),
+        )
+        dados = response.parsed.model_dump()
+
+    except UnidentifiedImageError as err:
+        logging.error(const.IMAGE_NOT_COMPATIBLE)
+        return {
+            "status": "erro",
+            "message": const.ERROR_GEMINI_WRONG_FORMAT,
+            "arquivo": file.filename,
+        }, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+
+    except TimeoutException as err:
+        logging.error(const.GEMINI_NOT_RESPONDING)
+        return {
+            "status": "erro",
+            "message": const.ERROR_GEMINI_TIMEOUT,
+            "arquivo": file.filename,
+        }, HTTPStatus.GATEWAY_TIMEOUT
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    # 2. SALVAMENTO NO BANCO DE DADOS
+    session = Session()
+    produtos_salvos = []
+
+    try:
+        if "loja" in dados:
+            loja_dados = dados["loja"]
+            lojaDuplicada = (
+                session.query(Estabelecimento)
+                .filter_by(endereco=loja_dados["endereco"])
+                .first()
+            )
+            if not lojaDuplicada:
+                loja = Estabelecimento(
+                    loja_dados["nome"],
+                    loja_dados["descricao"],
+                    loja_dados["endereco"],
+                )
+                session.add(loja)
+
+        for item in dados["produtos"]:
+            produto = Produto(
+                nome=item["nome"],
+                marca=item.get("marca", "Sem marca"),
+                data_da_compra=item.get("data", datetime.now()),
+                preco=item["preco"],
+            )
+            session.add(produto)
+            produtos_salvos.append(produto.nome)
+
+        if not len(produtos_salvos):
+            logging.error(const.PRODUCT_NOT_FOUND)
+            return {
+                "status": "erro",
+                "message": f"{len(produtos_salvos)} {const.ERROR_SQL_ADD_FROM_IMAGE}",
+                "arquivo": file.filename,
+            }, HTTPStatus.LENGTH_REQUIRED
+
+        session.commit()
+        return {
+            "status": "sucesso",
+            "message": f"{len(produtos_salvos)} {const.SUCCESS_SQL_PRODUCT_ADD}",
+            "produtos_extraidos": dados["produtos"],
+        }, HTTPStatus.OK
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    finally:
+        session.close()
+
+
+#####################################
+######## 4. Manipulação de Listas
+####
+
+
+@app.post(
+    "/adicionar_item_a_lista",
+    tags=[tag_listas],
+    responses={
+        HTTPStatus.OK: ProdutoAdicionadoNaLista,
+        HTTPStatus.NOT_FOUND: ErrorSchema,
+    },
+)
+def adicionar_item_a_lista(body: ListaDeComprasSchema):
+    """
+    Adiciona itens a lista de compra
+    """
+    logging.info("inicio da funcao < adicionar_item_a_lista >")
+    logging.debug(f"form.itens: {body.itens}")
+    session = Session()
+    try:
+        # 1. Verifica se a lista existe
+        query_lista_de_compras = (
+            session.query(ListaDeCompras).filter_by(titulo=body.titulo).first()
+        )
+        if not query_lista_de_compras:
+            return {"message": const.ERROR_SQL_LIST_NOT_FOUND}, HTTPStatus.NOT_FOUND
+
+        # 2. Puxa todos os nomes que serão adicionados
+        item_tmp = [
+            {
+                "nome": item.nome,
+                "marca": item.marca,
+                "quantidade": item.quantidade,
+                "preco_medio": item.preco_medio,
+            }
+            for item in body.itens
+        ]
+        logging.debug(f"item_tmp: {item_tmp}")
+
+        # 3. Puxa todos os nomes que estão na lista selecionada
+        produtos_listados = [
+            item.produto.nome.lower() for item in query_lista_de_compras.itens
+        ]
+        logging.debug(f"produtos_listados: {produtos_listados}")
+
+        itens_novos_para_adicionar = [
+            newItem
+            for newItem in item_tmp  # passar por cada indice da array expondo um unico objeto por vez
+            if newItem["nome"].lower() not in produtos_listados
+        ]
+        logging.debug(f"itens_novos_para_adicionar: {itens_novos_para_adicionar}")
+
+        nomes_para_buscar = [
+            newItem["nome"].lower()
+            for newItem in itens_novos_para_adicionar
+            # if newItem["nome"].lower() not in produtos_listados
+        ]
+
+        novosItensTotal = len(nomes_para_buscar)
+        itensNaoAdicionados = len(produtos_listados)
+
+        if not itens_novos_para_adicionar:
+            return {
+                "message": "Nenhum item novo adicionado (todos já existiam).",
+                "addedQuantity": 0,
+                "quantityNotAdded": itensNaoAdicionados,
+            }, HTTPStatus.OK
+
+        produtos_no_banco = session.query(Produto).filter(
+            func.lower(Produto.nome).in_(nomes_para_buscar)
+        )
+        logging.debug(f"produtos_no_banco: {produtos_no_banco}")
+
+        mapa_produtos = {p.nome.lower(): p.id for p in produtos_no_banco}
+
+        logging.debug(f"mapa_produtos: {mapa_produtos}")
+
+        # 4. Adiciona somente os que não estão repetidos
+        for x in item_tmp:
+            logging.debug(x)
+            lookupName = x["nome"].lower()
+            if lookupName in produtos_listados:
+                logging.debug(f"produto {x['nome'].lower()} ja esta na lista")
+
+            else:
+                logging.debug(f"produto {x['nome'].lower()} sera incluido na lista")
+                session.add(
+                    ListaDeItens(
+                        quantidade=x["quantidade"],
+                        lista_id=query_lista_de_compras.id,
+                        produto_id=mapa_produtos.get(lookupName),
+                    )
+                )
+        session.commit()
+
+        return {
+            "message": const.SUCCESS_SQL_LIST_ADD,
+            "addedQuantity": novosItensTotal,
+            "quantityNotAdded": itensNaoAdicionados,
+        }, HTTPStatus.OK
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    finally:
+        session.close()
+        logging.info("concluida a funcao < adicionar_item_a_lista >")
+
+
+@app.post(
+    "/buscar_lista_de_compra",
+    tags=[tag_listas],
+    responses={
+        HTTPStatus.OK: ListReplySchema,
+        HTTPStatus.NOT_FOUND: ErrorSchema,
+    },
+)
+def buscar_lista_de_compra(form: BuscarListaDeCompras):
+    """
+    Busca os itens de uma lista de compras
+    """
+    logging.info("inicio da funcao < buscar_lista_de_compra >")
+    logging.debug(f"form.titulo: {form.titulo}")
+    session = Session()
+    try:
+        # 1. Verifica se a lista existe
+        query_lista_de_compras = (
+            session.query(ListaDeCompras).filter_by(titulo=form.titulo).first()
+        )
+        if not query_lista_de_compras:
+            return {"message": const.ERROR_SQL_LIST_NOT_FOUND}, HTTPStatus.NOT_FOUND
+
+        outputValue = {
+            form.titulo: [
+                {
+                    "nome": item.produto.nome,
+                    "marca": item.produto.marca,
+                    "quantidade": item.quantidade,
+                }
+                for item in query_lista_de_compras.itens
+            ]
+        }
+
+        return ListReplySchema(), HTTPStatus.OK
     
-    finally: session.close()
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    finally:
+        session.close()
+        logging.info("concluida a funcao < buscar_lista_de_compra >")
+
+
+############################
+######## → Rotas em teste
+####
+
+
+@app.get(
+    "/ver_produtos_cadastrados",
+    tags=[tag_dev],
+    responses={
+        HTTPStatus.OK: ConsultaSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
+    },
+)
+def ver_produtos_cadastrados():
+    """
+    Retorna todos os produtos da tabela produtos
+    """
+    try:
+        session = Session()
+
+        lista_produtos = [
+            {
+                "id": produto.id,
+                "nome": produto.nome,
+                "data_da_compra": produto.data_da_compra,
+                "preco": float(produto.preco),
+            }
+            for produto in session.query(Produto).all()
+        ]
+
+        return {"produtos": lista_produtos}, HTTPStatus.OK
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    finally:
+        session.close()
+
+
+@app.post(
+    "/cadastrar_produto",
+    tags=[tag_dev],
+    responses={
+        HTTPStatus.OK: ConsultaSchema,
+        HTTPStatus.CONFLICT: ErrorSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
+    },
+)
+def cadastrarProdutos(form: CriarListaDeCompras):
+    """
+    Cria uma lista de compras
+    """
+    session = Session()
+    try:
+        duplicateList = (
+            session.query(ListaDeCompras).filter_by(titulo=form.titulo).first()
+        )
+
+        if duplicateList:
+            return {
+                "message": const.ERROR_SQL_LIST_ALREADY_IN_DATABASE
+            }, HTTPStatus.CONFLICT
+
+        lista = ListaDeCompras(form.titulo)
+        session.add(lista)
+        session.commit()
+
+        return {"message": const.SUCCESS_SQL_LIST_ADD}, HTTPStatus.OK
+    
+    except Exception as e: return return_error(ErrorSchema,e,session)
+    
+    finally:
+        session.close()
+
+
+# ==========================================
+# 4. MANIPULAÇÃO DE USUÁRIOS
+# ==========================================
+
+# ==========================================
+# 5. MANIPULAÇÃO DE PRODUTOS
+# ==========================================
+
+# ==========================================
+# 6. MANIPULAÇÃO DE LISTAS
+# ==========================================
+
+
+@app.post(
+    "/apagar_lista_de_compras",
+    tags=[tag_listas],
+    responses={
+        HTTPStatus.OK: ListReplySchema,
+        HTTPStatus.NOT_FOUND: ListErrorSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
+    },
+)
+@log_execucao
+def apagar_lista_de_compras(form: BuscarListaDeCompras):
+    """
+    Apaga a lista de compras
+    """
+    logging.debug(f"form recebida: {form}")
+    session = Session()
+    try:
+        query_lista_de_compras = (
+            session.query(ListaDeCompras).filter_by(titulo=form.titulo).first()
+        )
+        if not query_lista_de_compras:
+            logging.info(f"a lista de compras {form.titulo} não foi encontrada")
+            return (
+                ListErrorSchema(message=const.ERROR_SQL_LIST_NOT_FOUND).model_dump(),
+                HTTPStatus.NOT_FOUND,
+            )
+
+        session.delete(query_lista_de_compras)
+        session.commit()
+        return (
+            ListReplySchema(message=const.SUCCESS_SQL_LIST_REMOVE).model_dump(),
+            HTTPStatus.OK,
+        )
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+    # except Exception as e:
+    #     logging.error(e)
+    #     session.rollback()
+    #     return (
+    #         ErrorSchema(message=const.ERRO_INTERNO, error=str(e)).model_dump(),
+    #         HTTPStatus.INTERNAL_SERVER_ERROR,
+    #     )
+
+    finally:
+        session.close()
+
+
+@app.post(
+    "/criar_lista_de_compras",
+    tags=[tag_listas],
+    responses={
+        HTTPStatus.OK: ListReplySchema,
+        HTTPStatus.CONFLICT: ListErrorSchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
+    },
+)
+@log_execucao
+def criar_lista_de_compras(form: CriarListaDeCompras):
+    """
+    Cria uma lista de compras
+    """
+    logging.debug(f"form recebida: {form}")
+    session = Session()
+    try:
+        query = session.query(ListaDeCompras).filter_by(titulo=form.titulo).first()
+
+        if query:
+            logging.debug(f"A lista ja existe")
+            return (
+                ListErrorSchema(
+                    message=const.ERROR_SQL_LIST_ALREADY_IN_DATABASE
+                ).model_dump(),
+                HTTPStatus.CONFLICT,
+            )
+
+        lista = ListaDeCompras(titulo=form.titulo)
+        session.add(lista)
+        session.commit()
+        return (
+            ListReplySchema(message=const.SUCCESS_SQL_LIST_ADD).model_dump(),
+            HTTPStatus.OK,
+        )
+    except Exception as e: return return_error(ErrorSchema,e,session)
+    
+    finally:
+        session.close()
+
+
+@app.post(
+    "/apagar_item_da_lista",
+    tags=[tag_listas],
+    responses={
+        HTTPStatus.OK: ListReplySchema,
+        HTTPStatus.NOT_FOUND: ListReplySchema,
+        HTTPStatus.INTERNAL_SERVER_ERROR: ErrorSchema,
+    },
+)
+@log_execucao
+def apagar_item_da_lista(form: ApagarItemDaLista):
+    """
+    Apaga itens da lista de compras
+    """
+    logging.debug(f"form: {form}")
+    session = Session()
+    try:
+        query_lista = (
+            session.query(ListaDeCompras).filter_by(titulo=form.titulo).first()
+        )
+        if not query_lista:
+            return (
+                ListReplySchema(message=const.ERROR_SQL_LIST_NOT_FOUND).model_dump(),
+                HTTPStatus.NOT_FOUND,
+            )
+
+        lista_para_apagar = [item.nome.lower() for item in form.itens]
+        logging.debug(f"lista_para_apagar: {lista_para_apagar}")
+
+        pegar_ids_dos_produtos = (
+            session.query(Produto.id)
+            .filter(func.lower(Produto.nome).in_(lista_para_apagar))
+            .all()
+        )
+        ids_dos_produtos = [
+            item.id for item in pegar_ids_dos_produtos
+        ]
+        logging.debug(f"ids_dos_produtos: {ids_dos_produtos}")
+
+        linhas_apagadas = (
+            session.query(ListaDeItens)
+            .filter(
+                ListaDeItens.lista_id == query_lista.id,
+                ListaDeItens.produto_id.in_(ids_dos_produtos),
+            )
+            .delete(synchronize_session=False)
+        )
+
+        if linhas_apagadas == 0:
+            return (
+                ListReplySchema(
+                    message=const.ERROR_SQL_LIST_PRODUCT_NOT_FOUND
+                ).model_dump(),
+                HTTPStatus.NOT_FOUND,
+            )
+
+        session.commit()
+        
+        return (
+            ListReplySchema(message=const.SUCCESS_SQL_LIST_PRODUCT_DEL).model_dump(),
+            HTTPStatus.OK,
+        )
+
+    except Exception as e: return return_error(ErrorSchema,e,session)
+
+    finally:
+        session.close()

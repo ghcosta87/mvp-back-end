@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
-from model.produto import Produto
-from model.estabelecimento import Estabelecimento
+# from model.produto import Produto
+# from model.estabelecimento import Estabelecimento
 from model.constants import *
 
 from schemas.estabelecimento import EstabelecimentoSchema
@@ -11,7 +11,6 @@ from datetime import datetime
 
 from pydantic import BaseModel
 from typing import List
-
 
 class ItemExtraido(BaseModel):
     """Representa um único produto lido da nota fiscal"""
@@ -63,6 +62,7 @@ class HistoricoItemSchema(BaseModel):
     valor: float 
     
 class ConsultaSchema(BaseModel):
-    produtos: list[ProdutoItemSchema]
-    estatisticas: list[EstatisticaSchema]
-    historico: dict[str, list[HistoricoItemSchema]]
+    produtos: List[ProdutoItemSchema]
+    estatisticas: List[EstatisticaSchema]
+    historico: dict[str, List[HistoricoItemSchema]]
+   

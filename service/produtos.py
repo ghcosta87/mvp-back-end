@@ -1,9 +1,12 @@
-# from model.produto import Produto
-# from sqlalchemy import func
+from model.produto import Produto
+from sqlalchemy import func
 
-# def cadastrarProduto(session,produtoParaCadastro):
-#     return 0
 
+def cadastrarProduto(session,produtoParaCadastro):
+    return 0
+
+def unificarProdutos(session,produto):
+    return 0
 
 
 

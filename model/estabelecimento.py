@@ -12,7 +12,7 @@ class Estabelecimento(Base):
     endereco = Column(String(200), unique=True)
     data_de_cadastro = Column(DateTime, default=datetime.now())
 
-    def __init__(self, id: int, nome: str, descricao: str, endereco: str):
+    def __init__(self, nome: str, descricao: str, endereco: str):
         """
         Cadastra um novo estabelecimento no banco de dados
         id: id do estabelecimento
@@ -21,7 +21,6 @@ class Estabelecimento(Base):
         endereco: endereco do estabelecimento
         data_de_cadastro:  data de cadastro do estabelecimento
         """
-        self.id = id
         self.nome = nome
         self.descricao = descricao
         self.endereco = endereco

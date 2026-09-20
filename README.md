@@ -67,62 +67,32 @@ meu-mvp/
 
 
 ## 🖥️ CONFIGURANDO PARA SELF HOSTING 
+
+### Docker compose
 ```bash
-mkdir precohub
-cd precohub
-git clone https://github.com/ghcosta87/mvp-back-end.git
-mv mvp-back-end backend
- 
-git clone https://github.com/ghcosta87/mvp-front-end.git
-mv mvp-front-end frontend
+services:
+  api:
+    build: https://github.com/ghcosta87/mvp-back-end.git#preco-hub-v2-beta
+    ports:
+      - "35111:5000"
+    restart: unless-stopped
+    volumes:
+      - ./database:/app/database
+    environment:
+      - API_KEY=YOUR_API_KEY
 
-echo "FROM python:3.10-slim" > backend/Dockerfile
-echo "WORKDIR /app" >> backend/Dockerfile
-echo "COPY requirements.txt ." >> backend/Dockerfile 
-echo "RUN pip3 install -r requirements.txt" >> backend/Dockerfile
-echo "COPY . ." >> backend/Dockerfile
-echo "EXPOSE 5000" >> backend/Dockerfile
-echo 'CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]' >> backend/Dockerfile
-
-echo "FROM nginx:alpine" > frontend/Dockerfile
-echo "COPY . /usr/share/nginx/html" >> frontend/Dockerfile
-echo "EXPOSE 80" >> frontend/Dockerfile
-nano frontend/js/constantes.js
-
-echo "services:" > docker-compose.yaml
-echo "  api:" >> docker-compose.yaml
-echo "    build: ./backend" >> docker-compose.yaml
-echo "    ports:" >> docker-compose.yaml
-echo "      - "35111:5000"" >> docker-compose.yaml
-echo "    restart: unless-stopped" >> docker-compose.yaml
-echo "    volumes:" >> docker-compose.yaml
-echo "      - ./backend/database:/app/database" >> docker-compose.yaml
-echo "      - ./backend/.env:/app/.env" >> docker-compose.yaml
-echo "  web:" >> docker-compose.yaml
-echo "    build: ./frontend" >> docker-compose.yaml
-echo "    ports:" >> docker-compose.yaml
-echo "      - "35112:80"" >> docker-compose.yaml
-echo "    depends_on:" >> docker-compose.yaml
-echo "      - api" >> docker-compose.yaml
-echo "    restart: unless-stopped" >> docker-compose.yaml
-
-docker compose build
-
-mv frontend/Dockerfile .Dockerfile-frontend
-mv backend/Dockerfile .Dockerfile-backend
-
-rm -Rf frontend backend
-mkdir backend backend/database
-
-echo 'API_NAME="Gemini API Key"' > backend/.env
-echo 'API_KEY=""' >> backend/.env
-echo 'PROJECT_NAME=""' >> backend/.env 
-echo 'PROJECT_NUMBER=""' >> backend/.env
-
-nano backend/.env
-
-docker compose up -d
+  web:
+    build: https://github.com/ghcosta87/mvp-front-end.git#preco-hub-v2-beta
+    ports:
+      - "35112:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    environment:
+      - HOST_IP=IP_DO_BACKEND
+    command: /bin/sh -c "sed -i 's|http://127.0.0.1:5000|'\"$$HOST_IP\"'|g' /usr/share/nginx/html/js/constantes.js && nginx -g 'daemon off;'"
 ```
+
 Através do navegador de sua preferência digite o ip-da-maquina:35112
 
 ## BUGS CONHECIDOS

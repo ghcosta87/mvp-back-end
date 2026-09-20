@@ -21,6 +21,9 @@ ERROR_GEMINI_TIMEOUT="O tempo de análise esgotou. Tente enviar novamente."
 # ==========================================
 SUCCESS_SQL_PRODUCT_ADD=" produtos salvos com sucesso!"
 SUCCESS_SQL_USER_DEL="Usuário deletado com sucesso!"
+SUCCESS_SQL_LIST_ADD="Lista criada com sucesso!"
+SUCCESS_SQL_LIST_REMOVE="Lista removida"
+SUCCESS_SQL_LIST_PRODUCT_DEL="Produtos selecionados foram removidos."
 SUCCESS_LOGIN_AUTHORIZED="Login realizado com sucesso"
 
 ERROR_SQL_PRODUCT_ADD="Erro ao adicionar produtos no banco de dados:"
@@ -29,6 +32,12 @@ ERROR_SQL_USER_NOT_FOUND="Usuário não encontrado."
 ERROR_SQL_USER_DEL="Não foi possível deletar o usuário: "
 ERROR_SQL_USER_WRONG_PASSWORD="Senha incorreta."
 ERROR_SQL_USER_ALREADY_IN_DATABASE="CPF, E-mail ou Telefone já cadastrados."
+
+ERROR_SQL_LIST_ALREADY_IN_DATABASE="Lista já está cadastrada."
+ERROR_SQL_LIST_NOT_FOUND="Lista não encontrada."
+ERROR_SQL_LIST_REMOVED="Lista removida."
+ERROR_SQL_LIST_PRODUCT_NOT_FOUND="Produto não encontrado na lista."
+
 ERROR_SQL_ADD_FROM_IMAGE="Nenhum produto encontrado."
 
 ERROR_SQL_UNKNOWN="algo estranho aconteceu ..."
@@ -45,3 +54,8 @@ ERROR_EMPTY_FILE="O arquivo enviado está vazio."
 IMAGE_NOT_COMPATIBLE="Formato de imagem não compativel."
 GEMINI_NOT_RESPONDING="API do Gemini demoroua responder"
 PRODUCT_NOT_FOUND="API do Gemini não encontrou nenhum produto"
+
+# ==========================================
+# 5. OTHER
+# ==========================================
+ERRO_INTERNO="Ocorreu um erro interno"

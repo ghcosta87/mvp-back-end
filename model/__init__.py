@@ -9,6 +9,7 @@ from model.base import Base
 from model.usuarios import Usuario
 from model.produto import Produto
 from model.estabelecimento import Estabelecimento
+from model.lista import *
 
 db_path = "database/"
 # Verifica se o diretorio não existe

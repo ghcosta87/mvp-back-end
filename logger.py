@@ -1,5 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
+from functools import wraps
 import os
 
 def configurar_logs():
@@ -39,3 +40,16 @@ def configurar_logs():
     logging.getLogger("httpx").setLevel(logging.DEBUG)
     logging.getLogger("google.genai").setLevel(logging.DEBUG)
     logging.getLogger("PIL").setLevel(logging.DEBUG)
+    
+def log_execucao(func):
+    """Decorator que loga automaticamente o início e o fim de qualquer função"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # func.__name__ pega o nome exato da função dinamicamente!
+        logging.info(f"[{func.__name__}] Iniciando execução...")
+        
+        resultado = func(*args, **kwargs) # Executa a sua função de verdade
+        
+        logging.info(f"[{func.__name__}] Execução finalizada com sucesso.")
+        return resultado
+    return wrapper
