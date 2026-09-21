@@ -20,13 +20,17 @@ ERROR_GEMINI_TIMEOUT="O tempo de análise esgotou. Tente enviar novamente."
 # 2. SQL CONSTANTS
 # ==========================================
 SUCCESS_SQL_PRODUCT_ADD=" produtos salvos com sucesso!"
+SUCCESS_SQL_PRODUCT_UPADTE="O produto foi atualizado."
+
 SUCCESS_SQL_USER_DEL="Usuário deletado com sucesso!"
+SUCCESS_LOGIN_AUTHORIZED="Login realizado com sucesso"
+
 SUCCESS_SQL_LIST_ADD="Lista criada com sucesso!"
 SUCCESS_SQL_LIST_REMOVE="Lista removida"
 SUCCESS_SQL_LIST_PRODUCT_DEL="Produtos selecionados foram removidos."
-SUCCESS_LOGIN_AUTHORIZED="Login realizado com sucesso"
 
 ERROR_SQL_PRODUCT_ADD="Erro ao adicionar produtos no banco de dados:"
+ERROR_SQL_PRODUCT_NOT_FOUND="O produto não foi encontrado."
 
 ERROR_SQL_USER_NOT_FOUND="Usuário não encontrado."
 ERROR_SQL_USER_DEL="Não foi possível deletar o usuário: "

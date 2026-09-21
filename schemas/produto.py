@@ -12,6 +12,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import List
 
+
 class ItemExtraido(BaseModel):
     """Representa um único produto lido da nota fiscal"""
 
@@ -20,6 +21,7 @@ class ItemExtraido(BaseModel):
     marca: str
     loja: str
     preco: float
+
 
 class CupomExtraidoSchema(BaseModel):
     """Representa o resultado total que a IA vai devolver"""
@@ -44,25 +46,52 @@ class ProdutoSchema(BaseModel):
     # data_de_cadastro = datetime.now()
     data_de_cadastro: datetime = Field(default_factory=datetime.now)
 
+
 class ProdutoItemSchema(BaseModel):
-    id: int 
+    id: int
     nome: str
-    data_da_compra: datetime 
-    preco: float 
-    
+    data_da_compra: datetime
+    preco: float
+
+
 class EstatisticaSchema(BaseModel):
-    nome: str 
+    nome: str
     total_compras: int
     preco_medio: float
     menor_preco: float
-    maior_preco: float 
-    
+    maior_preco: float
+
+
 class HistoricoItemSchema(BaseModel):
-    data: datetime 
-    valor: float 
-    
+    data: datetime
+    valor: float
+
+
 class ConsultaSchema(BaseModel):
     produtos: List[ProdutoItemSchema]
     estatisticas: List[EstatisticaSchema]
     historico: dict[str, List[HistoricoItemSchema]]
-   
+
+
+class ProductNotFoundSchema(BaseModel):
+    message: str
+    product_name: str
+
+
+class ProductUpdateReplySchema(BaseModel):
+    nome_antigo: str = "Leite Zero Lactose"
+    nome: str = "Leite Zero Lactose 1L"
+    marca: str = "Parmalat"
+    preco: float = 9.99
+    data_da_compra: datetime = Field(default_factory=datetime.now)
+    message: str = "Mensagem de edição com sucesso"
+
+class ProductReplySchema(BaseModel):
+    """Define como um novo produto a ser inserido deve ser representado"""
+
+    nome: str
+    marca: str
+    preco: float
+    data_da_compra: datetime 
+    data_de_cadastro: datetime = Field(default_factory=datetime.now)
+    message: str

@@ -44,7 +44,7 @@ class ProdutoAdicionadoNaLista(BaseModel):
 # ==========================================
 
 
-class CriarListaDeCompras(BaseModel):
+class CriarListaDeComprasSchema(BaseModel):
     titulo: str = "João Pessoa com Matheus"
 
 
@@ -68,3 +68,8 @@ class ListReplySchema(BaseModel):
 
 class ListErrorSchema(BaseModel):
     message: str
+    
+class AddListReplySchema(BaseModel):
+    message: str
+    addedQuantity: int
+    quantityNotAdded: int
