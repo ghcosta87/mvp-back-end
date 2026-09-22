@@ -497,12 +497,6 @@ def cadastrarProdutos(form: CriarListaDeComprasSchema):
 # ==========================================
 
 
-
-#####################################
-######## 2. Manipulação de Produtos
-####
-
-
 @app.get(
     "/produtos",
     tags=[tag_produtos],
@@ -522,6 +516,7 @@ def listar_produtos():
             {
                 "id": produto.id,
                 "nome": produto.nome,
+                "marca": produto.marca,
                 "data_da_compra": produto.data_da_compra,
                 "preco": produto.preco,
             }
@@ -630,7 +625,7 @@ def add_product(form: ProdutoSchema):
         session.close()
 
 
-@app.post(
+@app.put(
     "/update_product_info",
     tags=[tag_produtos],
     responses={
@@ -677,6 +672,7 @@ def update_product_info(form: ProductUpdateReplySchema):
             HTTPStatus.OK,
         )
     except Exception as e:
+        session.rollback()
         return return_error(ErrorSchema, e, session)
 
     finally:
