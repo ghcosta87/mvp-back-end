@@ -1,3 +1,4 @@
+APP_VERSION = "v2.0.0-beta"
 # ==========================================
 # 1. BIBLIOTECAS NATIVAS DO PYTHON
 # ==========================================
@@ -103,18 +104,6 @@ register_heif_opener()  # Liga o suporte a HEIC dentro do Pillow
 info = Info(title="Minha API", version="0.0.1")
 app = OpenAPI(__name__, info=info)
 CORS(app)
-
-
-####################################
-######## → Homepage do Swagger
-####
-
-
-@app.get("/", tags=[tag_home])
-def home():
-    """Redireciona para /openapi, tela que permite a escolha do estilo de documentação."""
-    return redirect("/openapi")
-
 
 #####################################
 ######## 1. Manipulação de Usuários
@@ -489,8 +478,25 @@ def cadastrarProdutos(form: CriarListaDeComprasSchema):
 
 
 # ==========================================
-# 4. MANIPULAÇÃO DE USUÁRIOS
+# 1. SWAGGER E CONTROLE DE VERSÃO
 # ==========================================
+
+
+@app.get("/", tags=[tag_home])
+@log_execucao
+def home():
+    """Redireciona para /openapi, tela que permite a escolha do estilo de documentação."""
+    return redirect("/openapi")
+
+
+@app.get("/version", tags=[tag_home])
+@log_execucao
+def get_version():
+    """
+    Carrega a versão do backend
+    """
+    return {"version": APP_VERSION}, HTTPStatus.OK
+
 
 # ==========================================
 # 5. MANIPULAÇÃO DE PRODUTOS
@@ -511,7 +517,7 @@ def listar_produtos():
     Retorna todos os produtos cadastrados no banco de dados
     """
     try:
-        session =Session()
+        session = Session()
         lista_produtos = [
             {
                 "id": produto.id,
