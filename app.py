@@ -644,7 +644,7 @@ def update_product_info(form: ProductUpdateReplySchema):
     session = Session()
     try:
 
-        product_query = session.query(Produto).filter_by(nome=form.nome_antigo).first()
+        product_query = session.query(Produto).filter_by(nome=form.nome_antigo).all()
         if not product_query:
             return (
                 ProductNotFoundSchema(
@@ -654,15 +654,17 @@ def update_product_info(form: ProductUpdateReplySchema):
                 HTTPStatus.NOT_FOUND,
             )
 
-        product_query.nome = form.nome
-        product_query.marca = form.marca
-        product_query.preco = form.preco
-        product_query.data_da_compra = form.data_da_compra
+        for item in product_query:
+            item.nome = form.nome
+            item.marca = form.marca
+            # product_query.preco = form.preco
+            # product_query.data_da_compra = form.data_da_compra
 
         session.commit()
 
         return (
             ProductUpdateReplySchema(
+                nome_antigo=form.nome_antigo,
                 nome=form.nome,
                 marca=form.marca,
                 preco=form.preco,
