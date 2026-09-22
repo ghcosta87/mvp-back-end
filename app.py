@@ -657,7 +657,7 @@ def update_product_info(form: ProductUpdateReplySchema):
         for item in product_query:
             item.nome = form.nome
             item.marca = form.marca
-            # product_query.preco = form.preco
+            item.preco = form.preco
             # product_query.data_da_compra = form.data_da_compra
 
         session.commit()
